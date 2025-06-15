@@ -128,5 +128,35 @@
     "total_frames_processed": 246,
     "confidence_threshold": 0.5,
     "show_landmarks": true
+  },
+  {
+    "id": "4fdf047c-6673-4497-ac97-c5fe4ad16614",
+    "session_start": "2025-06-15T18:04:21.064804",
+    "session_end": null,
+    "session_type": "webcam",
+    "total_faces_detected": 0,
+    "total_frames_processed": 0,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
+  },
+  {
+    "id": "6c7297b0-8f4e-4187-a3e1-e0529ebfe775",
+    "session_start": "2025-06-15T18:04:25.893755",
+    "session_end": null,
+    "session_type": "webcam",
+    "total_faces_detected": 0,
+    "total_frames_processed": 0,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
+  },
+  {
+    "id": "540ff61e-28c5-4214-8fe3-0f1741bd88fc",
+    "session_start": "2025-06-15T18:04:43.674938",
+    "session_end": "2025-06-15T18:04:46.584054",
+    "session_type": "image",
+    "total_faces_detected": 34,
+    "total_frames_processed": 1,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
   }
 ]
