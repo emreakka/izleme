@@ -268,5 +268,15 @@
     "total_frames_processed": 246,
     "confidence_threshold": 0.3,
     "show_landmarks": true
+  },
+  {
+    "id": "9e7452ea-bffe-44aa-8ab1-432edb709d55",
+    "session_start": "2025-06-15T23:48:59.321824",
+    "session_end": "2025-06-15T23:49:01.155859",
+    "session_type": "image",
+    "total_faces_detected": 13,
+    "total_frames_processed": 1,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
   }
 ]

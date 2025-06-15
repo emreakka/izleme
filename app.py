@@ -177,23 +177,36 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
     
     # Process image with enhanced multi-method detection
     with st.spinner("Processing image with multiple detection methods..."):
-        simple_detector = SimpleDetector()
-        detections = simple_detector.detect_faces(image_array, confidence_threshold)
-        processed_image = simple_detector.draw_results(image_array, detections)
+        try:
+            simple_detector = SimpleDetector()
+            detections = simple_detector.detect_faces(image_array, confidence_threshold)
+            processed_image = simple_detector.draw_results(image_array, detections)
+            
+            if not detections:
+                st.warning("No faces detected. Try adjusting the confidence threshold or ensure the image contains clear faces.")
+                
+        except Exception as e:
+            st.error(f"Error during face detection: {str(e)}")
+            # Fallback: create empty results
+            detections = []
+            processed_image = image_array.copy()
         
         # Convert to standard format for storage
         results = []
         for detection in detections:
             result = {
-                'face_id': detection['face_id'],
-                'person_name': detection['person_name'],
-                'gaze_direction': detection['gaze_direction'],
+                'face_id': detection.get('face_id', len(results)+1),
+                'person_name': detection.get('person_name', f'Person-{len(results)+1}'),
+                'gaze_direction': detection.get('gaze_direction', 'unknown'),
                 'gaze_pitch': 0.0,
                 'gaze_yaw': 0.0,
-                'gaze_confidence': detection['gaze_confidence'],
+                'gaze_confidence': detection.get('gaze_confidence', 0.8),
                 'head_pose': (0.0, 0.0, 0.0),
-                'emotion': detection['emotion'],
-                'emotion_confidence': detection['emotion_confidence'],
+                'emotion': detection.get('emotion', 'neutral'),
+                'emotion_confidence': detection.get('emotion_confidence', 0.6),
+                'confidence': detection.get('confidence', 0.7),
+                'method': detection.get('method', 'opencv'),
+                'bbox': detection.get('bbox', (0, 0, 0, 0)),
                 'emotion_scores': {},
                 'is_known_person': False,
                 'face_similarity': 0.0,
@@ -228,14 +241,20 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
             # Show detection details
             with st.expander("Detection Details"):
                 for i, result in enumerate(results):
-                    st.write(f"**{result['person_name']}**")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write(f"- Gaze: {result['gaze_direction']}")
-                        st.write(f"- Emotion: {result['emotion']} ({result['emotion_confidence']:.2f})")
-                    with col2:
-                        st.write(f"- Confidence: {result['confidence']:.3f}")
-                        st.write(f"- Method: {result.get('method', 'N/A')}")
+                    try:
+                        st.write(f"**{result.get('person_name', f'Person-{i+1}')}**")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"- Gaze: {result.get('gaze_direction', 'unknown')}")
+                            emotion = result.get('emotion', 'neutral')
+                            emotion_conf = result.get('emotion_confidence', 0.0)
+                            st.write(f"- Emotion: {emotion} ({emotion_conf:.2f})")
+                        with col2:
+                            confidence = result.get('confidence', 0.0)
+                            st.write(f"- Confidence: {confidence:.3f}")
+                            st.write(f"- Method: {result.get('method', 'N/A')}")
+                    except Exception as e:
+                        st.error(f"Error displaying details for face {i+1}: {str(e)}")
         else:
             st.warning("No faces detected in the image.")
 

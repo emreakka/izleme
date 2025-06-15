@@ -10,7 +10,7 @@ class SimpleDetector:
         self._load_cascade()
         
     def _load_cascade(self):
-        """Load Haar cascade detector"""
+        """Load Haar cascade detector and MTCNN"""
         try:
             self.cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
             if self.cascade.empty():
@@ -19,6 +19,15 @@ class SimpleDetector:
                 print("Haar cascade loaded successfully")
         except Exception as e:
             print(f"ERROR loading Haar cascade: {e}")
+            
+        # Load MTCNN for better detection
+        try:
+            from mtcnn import MTCNN
+            self.mtcnn = MTCNN()
+            print("MTCNN detector loaded successfully")
+        except Exception as e:
+            print(f"MTCNN not available: {e}")
+            self.mtcnn = None
             
     def detect_faces(self, image: np.ndarray, confidence_threshold: float = 0.3) -> List[Dict]:
         """Detect faces using OpenCV Haar cascades"""
@@ -30,7 +39,29 @@ class SimpleDetector:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         h, w = image.shape[:2]
         
-        # Multiple detection passes with different parameters
+        # MTCNN detection (more accurate)
+        all_faces = []
+        if self.mtcnn is not None:
+            try:
+                rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                mtcnn_results = self.mtcnn.detect_faces(rgb_image)
+                print(f"MTCNN: Found {len(mtcnn_results)} faces")
+                
+                for result in mtcnn_results:
+                    bbox = result['box']
+                    x, y, w, h = bbox[0], bbox[1], bbox[2], bbox[3]
+                    confidence = result['confidence']
+                    
+                    if self._is_valid_face(x, y, w, h, image.shape[1], image.shape[0]):
+                        all_faces.append({
+                            'bbox': (x, y, w, h),
+                            'confidence': confidence,
+                            'method': 'mtcnn'
+                        })
+            except Exception as e:
+                print(f"MTCNN detection error: {e}")
+        
+        # Haar cascade detection as backup
         detection_params = [
             {'scaleFactor': 1.05, 'minNeighbors': 3, 'minSize': (20, 20), 'maxSize': (300, 300)},
             {'scaleFactor': 1.1, 'minNeighbors': 4, 'minSize': (30, 30), 'maxSize': (250, 250)},
@@ -39,22 +70,20 @@ class SimpleDetector:
             {'scaleFactor': 1.3, 'minNeighbors': 2, 'minSize': (40, 40), 'maxSize': (150, 150)},
         ]
         
-        all_faces = []
         for i, params in enumerate(detection_params):
             try:
                 faces = self.cascade.detectMultiScale(gray, **params)
-                print(f"Pass {i+1}: Found {len(faces)} faces with params {params}")
+                print(f"Haar Pass {i+1}: Found {len(faces)} faces")
                 
                 for (x, y, w, h) in faces:
-                    # Validate detection
                     if self._is_valid_face(x, y, w, h, image.shape[1], image.shape[0]):
                         all_faces.append({
                             'bbox': (x, y, w, h),
-                            'confidence': 0.7 + (i * 0.05),  # Slightly different confidence per method
+                            'confidence': 0.7 + (i * 0.05),
                             'method': f'haar_pass_{i+1}'
                         })
             except Exception as e:
-                print(f"Error in detection pass {i+1}: {e}")
+                print(f"Error in Haar detection pass {i+1}: {e}")
                 continue
         
         print(f"Total raw detections: {len(all_faces)}")
