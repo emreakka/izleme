@@ -18,11 +18,11 @@ def enhanced_process_frame(frame: np.ndarray, gaze_detector, emotion_detector,
         if face_recognition:
             face_info = face_recognition.recognize_faces(frame)
         
-        # Detect gaze with lower threshold for better detection
-        gaze_results = gaze_detector.detect_gaze(frame, max(0.2, confidence_threshold - 0.2))
+        # Detect gaze with very low threshold for better detection
+        gaze_results = gaze_detector.detect_gaze(frame, 0.1)
         
-        # Detect emotions with lower threshold
-        emotion_results = emotion_detector.detect_emotion(frame, max(0.2, confidence_threshold - 0.2))
+        # Detect emotions with very low threshold
+        emotion_results = emotion_detector.detect_emotion(frame, 0.1)
         
         # Combine all detections
         all_results = []
@@ -36,7 +36,7 @@ def enhanced_process_frame(frame: np.ndarray, gaze_detector, emotion_detector,
                 'gaze_pitch': gaze_result['gaze_angles'][0],
                 'gaze_yaw': gaze_result['gaze_angles'][1],
                 'gaze_confidence': gaze_result['confidence'],
-                'head_pose': gaze_result['head_pose'],
+                'head_pose': gaze_result.get('head_pose', (0.0, 0.0, 0.0)),
                 'emotion': 'neutral',
                 'emotion_confidence': 0.0,
                 'emotion_scores': {},

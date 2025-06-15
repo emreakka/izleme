@@ -48,5 +48,55 @@
     "total_frames_processed": 246,
     "confidence_threshold": 0.5,
     "show_landmarks": true
+  },
+  {
+    "id": "9c69b754-fda3-4d04-a118-ed0f17504749",
+    "session_start": "2025-06-15T17:42:48.066172",
+    "session_end": "2025-06-15T17:42:48.260309",
+    "session_type": "image",
+    "total_faces_detected": 0,
+    "total_frames_processed": 1,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
+  },
+  {
+    "id": "2ea68570-906d-468b-b020-c4a63125ed7b",
+    "session_start": "2025-06-15T17:42:55.251144",
+    "session_end": "2025-06-15T17:42:55.423319",
+    "session_type": "image",
+    "total_faces_detected": 0,
+    "total_frames_processed": 1,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
+  },
+  {
+    "id": "6a5d90fa-8379-439e-9804-b78b5eb06614",
+    "session_start": "2025-06-15T17:42:55.621813",
+    "session_end": "2025-06-15T17:42:55.789223",
+    "session_type": "image",
+    "total_faces_detected": 0,
+    "total_frames_processed": 1,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
+  },
+  {
+    "id": "cedd7982-c6a5-4953-9d47-0398de0c14b7",
+    "session_start": "2025-06-15T17:43:40.561922",
+    "session_end": "2025-06-15T17:43:40.741215",
+    "session_type": "image",
+    "total_faces_detected": 0,
+    "total_frames_processed": 1,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
+  },
+  {
+    "id": "99ab146e-7a23-4ca1-a755-f6dc43733fce",
+    "session_start": "2025-06-15T17:43:40.850081",
+    "session_end": "2025-06-15T17:43:58.808989",
+    "session_type": "video",
+    "total_faces_detected": 130,
+    "total_frames_processed": 246,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
   }
 ]

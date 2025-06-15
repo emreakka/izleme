@@ -10,7 +10,9 @@ from emotion_detector import EmotionDetector
 from face_recognition import FaceRecognitionSystem
 from utils import process_frame, draw_results
 from enhanced_utils import enhanced_process_frame
+from robust_face_detector import RobustFaceDetector
 from simple_storage import simple_storage
+from simple_robust_processing import simple_robust_process_frame
 
 # Initialize detectors
 @st.cache_resource
@@ -18,14 +20,15 @@ def load_detectors():
     gaze_detector = GazeDetector()
     emotion_detector = EmotionDetector()
     face_recognition = FaceRecognitionSystem()
-    return gaze_detector, emotion_detector, face_recognition
+    robust_detector = RobustFaceDetector()
+    return gaze_detector, emotion_detector, face_recognition, robust_detector
 
 def main():
     st.title("👁️ Gaze Direction & Emotion Detection")
     st.markdown("Upload an image/video or use your webcam to detect gaze direction and emotions in real-time.")
     
     # Load detectors
-    gaze_detector, emotion_detector, face_recognition = load_detectors()
+    gaze_detector, emotion_detector, face_recognition, robust_detector = load_detectors()
     
     # Sidebar for settings
     st.sidebar.header("Settings")
