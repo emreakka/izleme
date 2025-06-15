@@ -7,6 +7,7 @@ import os
 import time
 from gaze_detector import GazeDetector
 from emotion_detector import EmotionDetector
+from face_recognition import FaceRecognitionSystem
 from utils import process_frame, draw_results
 from simple_storage import simple_storage
 

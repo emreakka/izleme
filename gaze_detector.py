@@ -197,36 +197,76 @@ class GazeDetector:
         return direction, (float(combined_pitch), float(combined_yaw)), combined_confidence
     
     def _get_direction_label(self, yaw: float, pitch: float) -> str:
-        """Convert gaze angles to direction label with improved thresholds"""
-        # More sensitive thresholds for better accuracy
-        yaw_threshold = 8
-        pitch_threshold = 6
+        """Convert gaze angles to meaningful location descriptions"""
+        # Define thresholds for different regions
+        yaw_threshold_narrow = 8   # For center detection
+        yaw_threshold_wide = 25    # For far left/right
+        pitch_threshold_narrow = 6 # For straight ahead
+        pitch_threshold_wide = 20  # For far up/down
         
-        # Horizontal direction
-        if yaw < -yaw_threshold:
-            horizontal = "Left"
-        elif yaw > yaw_threshold:
-            horizontal = "Right"
-        else:
-            horizontal = "Center"
+        # Determine detailed gaze location
+        if abs(yaw) < yaw_threshold_narrow and abs(pitch) < pitch_threshold_narrow:
+            return "looking at camera"
         
-        # Vertical direction
-        if pitch < -pitch_threshold:
-            vertical = "Up"
-        elif pitch > pitch_threshold:
-            vertical = "Down"
-        else:
-            vertical = "Center"
+        # Looking down variations
+        elif pitch > pitch_threshold_wide:
+            if abs(yaw) < yaw_threshold_narrow:
+                return "looking at table/floor"
+            elif yaw > yaw_threshold_narrow:
+                return "looking at something down-right"
+            else:
+                return "looking at something down-left"
         
-        # Combine directions with better logic
-        if horizontal == "Center" and vertical == "Center":
-            return "Center"
-        elif horizontal == "Center":
-            return vertical
-        elif vertical == "Center":
-            return horizontal
+        # Looking up variations  
+        elif pitch < -pitch_threshold_wide:
+            if abs(yaw) < yaw_threshold_narrow:
+                return "looking at ceiling/above"
+            elif yaw > yaw_threshold_narrow:
+                return "looking at something up-right"
+            else:
+                return "looking at something up-left"
+        
+        # Horizontal looking
+        elif yaw > yaw_threshold_wide:
+            if abs(pitch) < pitch_threshold_narrow:
+                return "looking at person/object on right"
+            elif pitch > 0:
+                return "looking at something down-right"
+            else:
+                return "looking at something up-right"
+                
+        elif yaw < -yaw_threshold_wide:
+            if abs(pitch) < pitch_threshold_narrow:
+                return "looking at person/object on left"
+            elif pitch > 0:
+                return "looking at something down-left"
+            else:
+                return "looking at something up-left"
+        
+        # Moderate angles
+        elif yaw > yaw_threshold_narrow:
+            if pitch > pitch_threshold_narrow:
+                return "looking down-right"
+            elif pitch < -pitch_threshold_narrow:
+                return "looking up-right"
+            else:
+                return "looking right"
+                
+        elif yaw < -yaw_threshold_narrow:
+            if pitch > pitch_threshold_narrow:
+                return "looking down-left"
+            elif pitch < -pitch_threshold_narrow:
+                return "looking up-left"
+            else:
+                return "looking left"
+        
+        # Vertical only
+        elif pitch > pitch_threshold_narrow:
+            return "looking down"
+        elif pitch < -pitch_threshold_narrow:
+            return "looking up"
         else:
-            return f"{vertical}-{horizontal}"
+            return "looking straight ahead"
     
     def draw_gaze_overlay(self, image: np.ndarray, gaze_info: Dict, color: Tuple[int, int, int] = (0, 255, 0)) -> np.ndarray:
         """Draw gaze direction overlay on image"""

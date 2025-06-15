@@ -1,0 +1,36 @@
+[
+  {
+    "id": "5aa715f1-e846-470a-8985-0862f964b207",
+    "session_id": "a2029318-a8a4-4e8b-8a12-21718ae96f97",
+    "timestamp": "2025-06-15T17:24:30.408283",
+    "face_id": 1,
+    "gaze_direction": "Up",
+    "gaze_pitch": -33.25892857142857,
+    "gaze_yaw": -1.062219807742961,
+    "gaze_confidence": 0.76,
+    "head_pitch": -45.0,
+    "head_yaw": 2.806701033539877,
+    "head_roll": -26.262701585101322,
+    "emotion": "Unknown",
+    "emotion_confidence": 0.0,
+    "emotion_scores": {},
+    "frame_number": null
+  },
+  {
+    "id": "5c37199e-3e98-4286-aa00-c216bbeb9bb0",
+    "session_id": "a2029318-a8a4-4e8b-8a12-21718ae96f97",
+    "timestamp": "2025-06-15T17:24:30.408301",
+    "face_id": 2,
+    "gaze_direction": "Up-Left",
+    "gaze_pitch": -33.13333333333333,
+    "gaze_yaw": -26.401300807818433,
+    "gaze_confidence": 0.76,
+    "head_pitch": -45.0,
+    "head_yaw": -32.20593992953654,
+    "head_roll": 17.071021291319095,
+    "emotion": "Unknown",
+    "emotion_confidence": 0.0,
+    "emotion_scores": {},
+    "frame_number": null
+  }
+]

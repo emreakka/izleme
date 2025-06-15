@@ -1,0 +1,12 @@
+[
+  {
+    "id": "a2029318-a8a4-4e8b-8a12-21718ae96f97",
+    "session_start": "2025-06-15T17:24:30.229655",
+    "session_end": "2025-06-15T17:24:30.409884",
+    "session_type": "image",
+    "total_faces_detected": 2,
+    "total_frames_processed": 1,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
+  }
+]
