@@ -78,9 +78,10 @@ def main():
                 with st.sidebar.expander(f"{face_data['name']} ({face_data['encounter_count']} times)"):
                     new_name = st.text_input(f"Rename", value=face_data['name'], key=f"rename_{face_id}")
                     if st.button(f"Update Name", key=f"update_{face_id}"):
-                        if new_name and face_recognition.rename_face(face_id, new_name):
-                            st.success(f"Renamed to {new_name}")
-                            st.rerun()
+                        if new_name and new_name.strip():
+                            if face_recognition.rename_face(face_id, new_name.strip()):
+                                st.success(f"Renamed to {new_name}")
+                                st.rerun()
                     
                     if st.button(f"Forget Person", key=f"forget_{face_id}"):
                         if face_recognition.forget_face(face_id):
