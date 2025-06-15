@@ -45,7 +45,7 @@ class EmotionDetector:
         
         if face_results.multi_face_landmarks:
             for face_landmarks in face_results.multi_face_landmarks:
-                emotion_info = self._analyze_emotion(face_landmarks, image.shape)
+                emotion_info = self._analyze_emotion(face_landmarks, (image.shape[0], image.shape[1], image.shape[2]))
                 
                 if emotion_info['confidence'] >= confidence_threshold:
                     results.append(emotion_info)
