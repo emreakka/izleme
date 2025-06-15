@@ -565,7 +565,7 @@ class ComprehensiveDetector:
                 else:
                     weighted_emotions[emotion] = weighted_score
                     
-            best_emotion = max(weighted_emotions, key=weighted_emotions.get)
+            best_emotion = max(weighted_emotions.keys(), key=lambda k: weighted_emotions[k])
             best_confidence = weighted_emotions[best_emotion] / len(emotions)
             
             return best_emotion, min(best_confidence, 0.99)

@@ -175,8 +175,8 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
     st.subheader("Original Image")
     st.image(image, use_container_width=True)
     
-    # Process image with simple face detection
-    with st.spinner("Processing image..."):
+    # Process image with enhanced multi-method detection
+    with st.spinner("Processing image with multiple detection methods..."):
         simple_detector = SimpleDetector()
         detections = simple_detector.detect_faces(image_array, confidence_threshold)
         processed_image = simple_detector.draw_results(image_array, detections)
