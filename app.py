@@ -216,12 +216,26 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
     col1, col2 = st.columns(2)
     
     with col1:
-        st.image(processed_image, channels="BGR", caption="Processed Image", use_container_width=True)
+        # Convert BGR to RGB for proper display
+        processed_rgb = cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB)
+        st.image(processed_rgb, caption="Processed Image", use_container_width=True)
     
     with col2:
         if results:
             display_detection_results(results)
-            st.success(f"Detected {total_faces} face(s) and saved to database")
+            st.success(f"Successfully detected {total_faces} face(s) using multiple detection methods")
+            
+            # Show detection details
+            with st.expander("Detection Details"):
+                for i, result in enumerate(results):
+                    st.write(f"**{result['person_name']}**")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"- Gaze: {result['gaze_direction']}")
+                        st.write(f"- Emotion: {result['emotion']} ({result['emotion_confidence']:.2f})")
+                    with col2:
+                        st.write(f"- Confidence: {result['confidence']:.3f}")
+                        st.write(f"- Method: {result.get('method', 'N/A')}")
         else:
             st.warning("No faces detected in the image.")
 
