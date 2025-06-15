@@ -13,6 +13,7 @@ from enhanced_utils import enhanced_process_frame
 from robust_face_detector import RobustFaceDetector
 from simple_storage import simple_storage
 from simple_robust_processing import simple_robust_process_frame
+from working_face_detector import WorkingFaceDetector
 
 # Initialize detectors
 @st.cache_resource
@@ -167,12 +168,32 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
     st.subheader("Original Image")
     st.image(image, use_container_width=True)
     
-    # Process image with robust detection
+    # Process image with working face detection
     with st.spinner("Processing image..."):
-        robust_detector = RobustFaceDetector()
-        processed_image, results = simple_robust_process_frame(
-            image_array, robust_detector, confidence_threshold
-        )
+        working_detector = WorkingFaceDetector()
+        detections = working_detector.detect_faces(image_array)
+        processed_image = working_detector.draw_results(image_array, detections)
+        
+        # Convert to standard format for storage
+        results = []
+        for detection in detections:
+            result = {
+                'face_id': detection['face_id'],
+                'person_name': detection['person_name'],
+                'gaze_direction': detection['gaze_direction'],
+                'gaze_pitch': 0.0,
+                'gaze_yaw': 0.0,
+                'gaze_confidence': detection['gaze_confidence'],
+                'head_pose': (0.0, 0.0, 0.0),
+                'emotion': detection['emotion'],
+                'emotion_confidence': detection['emotion_confidence'],
+                'emotion_scores': {},
+                'is_known_person': False,
+                'face_similarity': 0.0,
+                'encounter_count': 1,
+                'processing_time_ms': 0
+            }
+            results.append(result)
     
     # Save results to storage
     total_faces = 0

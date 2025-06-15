@@ -98,5 +98,35 @@
     "total_frames_processed": 246,
     "confidence_threshold": 0.5,
     "show_landmarks": true
+  },
+  {
+    "id": "7faf3990-1b5b-4590-915d-d0a61ef3d01a",
+    "session_start": "2025-06-15T17:50:51.999782",
+    "session_end": "2025-06-15T17:51:11.047478",
+    "session_type": "video",
+    "total_faces_detected": 287,
+    "total_frames_processed": 246,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
+  },
+  {
+    "id": "7a4bb9a5-5cfe-45a0-8441-208c73452cf9",
+    "session_start": "2025-06-15T17:52:02.300766",
+    "session_end": "2025-06-15T17:52:16.863867",
+    "session_type": "image",
+    "total_faces_detected": 17,
+    "total_frames_processed": 1,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
+  },
+  {
+    "id": "c61510ff-f6d7-4429-92a2-8b3146491bc2",
+    "session_start": "2025-06-15T17:52:17.043542",
+    "session_end": "2025-06-15T17:52:44.660124",
+    "session_type": "video",
+    "total_faces_detected": 287,
+    "total_frames_processed": 246,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
   }
 ]

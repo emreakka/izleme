@@ -33,9 +33,9 @@ class RobustFaceDetector:
             import os
             # Try multiple possible paths for the cascade file
             possible_paths = [
+                'haarcascade_frontalface_default.xml',  # Downloaded file in current directory
                 '/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml',
-                '/usr/local/share/opencv4/haarcascades/haarcascade_frontalface_default.xml',
-                'haarcascade_frontalface_default.xml'
+                '/usr/local/share/opencv4/haarcascades/haarcascade_frontalface_default.xml'
             ]
             
             self.haar_face_cascade = None
