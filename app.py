@@ -16,6 +16,9 @@ from simple_robust_processing import simple_robust_process_frame
 from working_face_detector import WorkingFaceDetector
 from stable_face_detector import StableFaceDetector
 from advanced_face_detector import AdvancedFaceDetector
+from optimized_face_detector import OptimizedFaceDetector
+from enhanced_detector import EnhancedDetector
+from fast_detector import FastDetector
 
 # Initialize detectors
 @st.cache_resource
@@ -170,11 +173,11 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
     st.subheader("Original Image")
     st.image(image, use_container_width=True)
     
-    # Process image with advanced face detection
+    # Process image with enhanced face detection
     with st.spinner("Processing image..."):
-        advanced_detector = AdvancedFaceDetector()
-        detections = advanced_detector.detect_faces(image_array, confidence_threshold)
-        processed_image = advanced_detector.draw_advanced_results(image_array, detections)
+        enhanced_detector = EnhancedDetector()
+        detections = enhanced_detector.detect_faces(image_array, confidence_threshold)
+        processed_image = enhanced_detector.draw_results(image_array, detections)
         
         # Convert to standard format for storage
         results = []
