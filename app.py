@@ -166,8 +166,8 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, conf
 
 def process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, confidence_threshold, show_landmarks):
     """Process uploaded video"""
-    # Create database session
-    session_id = db_manager.create_session("video", confidence_threshold, show_landmarks)
+    # Create storage session
+    session_id = simple_storage.create_session("video", confidence_threshold, show_landmarks)
     
     # Save uploaded video to temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
@@ -209,9 +209,9 @@ def process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, conf
                     frame, gaze_detector, emotion_detector, confidence_threshold, show_landmarks
                 )
                 
-                # Save results to database
+                # Save results to storage
                 if results:
-                    db_manager.save_detection_results(session_id, results, frame_count)
+                    simple_storage.save_detection_results(session_id, results, frame_count)
                     total_faces += len(results)
                 
                 frames_processed += 1
@@ -228,8 +228,8 @@ def process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, conf
         
         cap.release()
         
-        # End database session
-        db_manager.end_session(session_id, total_faces, frames_processed)
+        # End storage session
+        simple_storage.end_session(session_id, total_faces, frames_processed)
         st.success(f"Video processing completed! {total_faces} faces detected in {frames_processed} processed frames")
     
     finally:
@@ -309,8 +309,8 @@ def show_analytics_dashboard():
             st.rerun()
     
     # Get analytics data
-    emotion_analytics = db_manager.get_emotion_analytics(days)
-    gaze_analytics = db_manager.get_gaze_analytics(days)
+    emotion_analytics = simple_storage.get_emotion_analytics(days)
+    gaze_analytics = simple_storage.get_gaze_analytics(days)
     
     # Display emotion analytics
     if emotion_analytics:
@@ -322,12 +322,17 @@ def show_analytics_dashboard():
             emotions = list(emotion_analytics.keys())
             counts = [data['total_detections'] for data in emotion_analytics.values()]
             
-            import pandas as pd
-            emotion_df = pd.DataFrame({
-                'Emotion': emotions,
-                'Count': counts
-            })
-            st.bar_chart(emotion_df.set_index('Emotion'))
+            try:
+                import pandas as pd
+                emotion_df = pd.DataFrame({
+                    'Emotion': emotions,
+                    'Count': counts
+                })
+                st.bar_chart(emotion_df.set_index('Emotion'))
+            except ImportError:
+                # Fallback to simple chart display
+                for emotion, count in zip(emotions, counts):
+                    st.text(f"{emotion}: {count}")
         
         with emotion_col2:
             st.markdown("**Emotion Statistics:**")
@@ -350,11 +355,17 @@ def show_analytics_dashboard():
             directions = list(gaze_analytics.keys())
             counts = [data['total_detections'] for data in gaze_analytics.values()]
             
-            gaze_df = pd.DataFrame({
-                'Direction': directions,
-                'Count': counts
-            })
-            st.bar_chart(gaze_df.set_index('Direction'))
+            try:
+                import pandas as pd
+                gaze_df = pd.DataFrame({
+                    'Direction': directions,
+                    'Count': counts
+                })
+                st.bar_chart(gaze_df.set_index('Direction'))
+            except ImportError:
+                # Fallback to simple chart display
+                for direction, count in zip(directions, counts):
+                    st.text(f"{direction}: {count}")
         
         with gaze_col2:
             st.markdown("**Gaze Statistics:**")
@@ -373,8 +384,8 @@ def show_analytics():
         st.subheader("📈 Quick Analytics")
         
         # Get recent analytics
-        emotion_data = db_manager.get_emotion_analytics(7)
-        gaze_data = db_manager.get_gaze_analytics(7)
+        emotion_data = simple_storage.get_emotion_analytics(7)
+        gaze_data = simple_storage.get_gaze_analytics(7)
         
         if emotion_data:
             st.markdown("**Top Emotions (7 days):**")
@@ -393,7 +404,7 @@ def show_session_history():
     with st.sidebar:
         st.subheader("📋 Recent Sessions")
         
-        sessions = db_manager.get_session_history(5)
+        sessions = simple_storage.get_session_history(5)
         
         if sessions:
             for session in sessions:
@@ -414,40 +425,45 @@ def show_session_details(session_id):
     """Show detailed session information"""
     st.subheader("Session Details")
     
-    details = db_manager.get_detection_details(session_id)
+    details = simple_storage.get_detection_details(session_id)
     
     if details:
         st.success(f"Found {len(details)} detection records")
         
         # Create DataFrame for detailed view
-        import pandas as pd
-        
-        records = []
-        for detail in details:
-            records.append({
-                'Timestamp': detail['timestamp'].strftime('%H:%M:%S'),
-                'Face ID': detail['face_id'],
-                'Emotion': detail['emotion'],
-                'Emotion Conf': f"{detail['emotion_confidence']:.2f}",
-                'Gaze Direction': detail['gaze_direction'],
-                'Gaze Conf': f"{detail['gaze_confidence']:.2f}",
-                'Head Yaw': f"{detail['head_pose'][1]:.1f}°",
-                'Head Pitch': f"{detail['head_pose'][0]:.1f}°",
-                'Frame': detail['frame_number'] or 'N/A',
-                'Processing (ms)': f"{detail['processing_time_ms']:.1f}" if detail['processing_time_ms'] else 'N/A'
-            })
-        
-        df = pd.DataFrame(records)
-        st.dataframe(df, use_container_width=True)
-        
-        # Download option
-        csv = df.to_csv(index=False)
-        st.download_button(
-            label="Download as CSV",
-            data=csv,
-            file_name=f"session_{session_id}_details.csv",
-            mime="text/csv"
-        )
+        try:
+            import pandas as pd
+            
+            records = []
+            for detail in details:
+                records.append({
+                    'Timestamp': detail['timestamp'].strftime('%H:%M:%S'),
+                    'Face ID': detail['face_id'],
+                    'Emotion': detail['emotion'],
+                    'Emotion Conf': f"{detail['emotion_confidence']:.2f}",
+                    'Gaze Direction': detail['gaze_direction'],
+                    'Gaze Conf': f"{detail['gaze_confidence']:.2f}",
+                    'Head Yaw': f"{detail['head_pose'][1]:.1f}°",
+                    'Head Pitch': f"{detail['head_pose'][0]:.1f}°",
+                    'Frame': detail['frame_number'] or 'N/A',
+                    'Processing (ms)': f"{detail['processing_time_ms']:.1f}" if detail['processing_time_ms'] else 'N/A'
+                })
+            
+            df = pd.DataFrame(records)
+            st.dataframe(df, use_container_width=True)
+            
+            # Download option
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="Download as CSV",
+                data=csv,
+                file_name=f"session_{session_id}_details.csv",
+                mime="text/csv"
+            )
+        except ImportError:
+            # Fallback to simple display
+            for detail in details:
+                st.text(f"{detail['timestamp'].strftime('%H:%M:%S')} - Face {detail['face_id']}: {detail['emotion']} ({detail['emotion_confidence']:.2f}), Gaze: {detail['gaze_direction']} ({detail['gaze_confidence']:.2f})")
     else:
         st.warning("No detection details found for this session")
 
