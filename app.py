@@ -16,14 +16,15 @@ from simple_storage import simple_storage
 def load_detectors():
     gaze_detector = GazeDetector()
     emotion_detector = EmotionDetector()
-    return gaze_detector, emotion_detector
+    face_recognition = FaceRecognitionSystem()
+    return gaze_detector, emotion_detector, face_recognition
 
 def main():
     st.title("👁️ Gaze Direction & Emotion Detection")
     st.markdown("Upload an image/video or use your webcam to detect gaze direction and emotions in real-time.")
     
     # Load detectors
-    gaze_detector, emotion_detector = load_detectors()
+    gaze_detector, emotion_detector, face_recognition = load_detectors()
     
     # Sidebar for settings
     st.sidebar.header("Settings")
@@ -46,27 +47,27 @@ def main():
         
         # Webcam section
         if st.button("Start Webcam Detection"):
-            run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, show_landmarks)
+            run_webcam_detection(gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks)
     
     with tab2:
         st.header("Image Upload")
         uploaded_image = st.file_uploader("Choose an image", type=['jpg', 'jpeg', 'png'])
         
         if uploaded_image is not None:
-            process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, confidence_threshold, show_landmarks)
+            process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks)
     
     with tab3:
         st.header("Video Upload")
         uploaded_video = st.file_uploader("Choose a video", type=['mp4', 'avi', 'mov'])
         
         if uploaded_video is not None:
-            process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, confidence_threshold, show_landmarks)
+            process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks)
     
     with tab4:
         st.header("Analytics Dashboard")
         show_analytics_dashboard()
 
-def run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, show_landmarks):
+def run_webcam_detection(gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks):
     """Run real-time webcam detection"""
     st.info("Starting webcam... Press 'Stop' to end detection.")
     
@@ -120,7 +121,7 @@ def run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, 
         simple_storage.end_session(session_id, total_faces, frame_count)
         st.success(f"Session completed: {total_faces} faces detected in {frame_count} frames")
 
-def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, confidence_threshold, show_landmarks):
+def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks):
     """Process uploaded image"""
     # Create storage session
     session_id = simple_storage.create_session("image", confidence_threshold, show_landmarks)
@@ -165,7 +166,7 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, conf
         else:
             st.warning("No faces detected in the image.")
 
-def process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, confidence_threshold, show_landmarks):
+def process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks):
     """Process uploaded video"""
     # Create storage session
     session_id = simple_storage.create_session("video", confidence_threshold, show_landmarks)

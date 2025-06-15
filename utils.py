@@ -5,7 +5,7 @@ from gaze_detector import GazeDetector
 from emotion_detector import EmotionDetector
 
 def process_frame(frame: np.ndarray, gaze_detector: GazeDetector, emotion_detector: EmotionDetector, 
-                 confidence_threshold: float = 0.5, show_landmarks: bool = True) -> Tuple[np.ndarray, List[Dict]]:
+                 face_recognition=None, confidence_threshold: float = 0.5, show_landmarks: bool = True) -> Tuple[np.ndarray, List[Dict]]:
     """
     Process a single frame for gaze and emotion detection
     
