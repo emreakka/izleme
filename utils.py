@@ -7,12 +7,13 @@ from emotion_detector import EmotionDetector
 def process_frame(frame: np.ndarray, gaze_detector: GazeDetector, emotion_detector: EmotionDetector, 
                  face_recognition=None, confidence_threshold: float = 0.5, show_landmarks: bool = True) -> Tuple[np.ndarray, List[Dict]]:
     """
-    Process a single frame for gaze and emotion detection
+    Process a single frame for gaze detection, emotion detection, and face recognition
     
     Args:
         frame: Input frame in BGR format
         gaze_detector: GazeDetector instance
         emotion_detector: EmotionDetector instance
+        face_recognition: FaceRecognitionSystem instance (optional)
         confidence_threshold: Minimum confidence for detections
         show_landmarks: Whether to show facial landmarks
         
@@ -24,6 +25,11 @@ def process_frame(frame: np.ndarray, gaze_detector: GazeDetector, emotion_detect
     results = []
     
     try:
+        # Face recognition first (if available)
+        face_info = []
+        if face_recognition:
+            face_info = face_recognition.recognize_faces(frame)
+        
         # Detect gaze
         gaze_results = gaze_detector.detect_gaze(frame, confidence_threshold)
         

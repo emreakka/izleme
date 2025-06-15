@@ -66,6 +66,31 @@ def main():
     with tab4:
         st.header("Analytics Dashboard")
         show_analytics_dashboard()
+    
+    # Add Face Management section to sidebar
+    if face_recognition:
+        st.sidebar.header("👤 Face Management")
+        known_faces = face_recognition.get_known_faces_summary()
+        
+        if known_faces:
+            st.sidebar.subheader("Known People")
+            for face_id, face_data in known_faces.items():
+                with st.sidebar.expander(f"{face_data['name']} ({face_data['encounter_count']} times)"):
+                    new_name = st.text_input(f"Rename", value=face_data['name'], key=f"rename_{face_id}")
+                    if st.button(f"Update Name", key=f"update_{face_id}"):
+                        if new_name and face_recognition.rename_face(face_id, new_name):
+                            st.success(f"Renamed to {new_name}")
+                            st.rerun()
+                    
+                    if st.button(f"Forget Person", key=f"forget_{face_id}"):
+                        if face_recognition.forget_face(face_id):
+                            st.success("Person forgotten")
+                            st.rerun()
+                    
+                    st.write(f"First seen: {face_data['first_seen'].strftime('%m/%d %H:%M')}")
+                    st.write(f"Last seen: {face_data['last_seen'].strftime('%m/%d %H:%M')}")
+        else:
+            st.sidebar.info("No known faces yet")
 
 def run_webcam_detection(gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks):
     """Run real-time webcam detection"""
@@ -140,7 +165,7 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
     # Process image
     with st.spinner("Processing image..."):
         processed_image, results = process_frame(
-            image_array, gaze_detector, emotion_detector, confidence_threshold, show_landmarks
+            image_array, gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks
         )
     
     # Save results to storage
