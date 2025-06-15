@@ -20,6 +20,7 @@ from optimized_face_detector import OptimizedFaceDetector
 from enhanced_detector import EnhancedDetector
 from fast_detector import FastDetector
 from simple_detector import SimpleDetector
+from comprehensive_detector import ComprehensiveDetector
 
 # Initialize detectors
 @st.cache_resource
