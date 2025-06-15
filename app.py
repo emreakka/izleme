@@ -4,9 +4,11 @@ import numpy as np
 from PIL import Image
 import tempfile
 import os
+import time
 from gaze_detector import GazeDetector
 from emotion_detector import EmotionDetector
 from utils import process_frame, draw_results
+from database import db_manager
 
 # Initialize detectors
 @st.cache_resource
@@ -27,8 +29,16 @@ def main():
     confidence_threshold = st.sidebar.slider("Confidence Threshold", 0.1, 1.0, 0.5, 0.1)
     show_landmarks = st.sidebar.checkbox("Show Facial Landmarks", value=True)
     
+    # Database controls
+    st.sidebar.header("Database")
+    if st.sidebar.button("View Analytics"):
+        show_analytics()
+    
+    if st.sidebar.button("View Session History"):
+        show_session_history()
+    
     # Main interface tabs
-    tab1, tab2, tab3 = st.tabs(["📷 Webcam", "🖼️ Upload Image", "🎥 Upload Video"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📷 Webcam", "🖼️ Upload Image", "🎥 Upload Video", "📊 Analytics"])
     
     with tab1:
         st.header("Real-time Webcam Detection")
@@ -50,10 +60,17 @@ def main():
         
         if uploaded_video is not None:
             process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, confidence_threshold, show_landmarks)
+    
+    with tab4:
+        st.header("Analytics Dashboard")
+        show_analytics_dashboard()
 
 def run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, show_landmarks):
     """Run real-time webcam detection"""
     st.info("Starting webcam... Press 'Stop' to end detection.")
+    
+    # Create database session
+    session_id = db_manager.create_session("webcam", confidence_threshold, show_landmarks)
     
     # Create placeholders for video and results
     video_placeholder = st.empty()
@@ -67,6 +84,9 @@ def run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, 
         st.error("Could not access webcam. Please check your camera permissions.")
         return
     
+    total_faces = 0
+    frame_count = 0
+    
     try:
         while not stop_button:
             ret, frame = cap.read()
@@ -74,10 +94,17 @@ def run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, 
                 st.error("Failed to read from webcam")
                 break
             
+            frame_count += 1
+            
             # Process frame
             processed_frame, results = process_frame(
                 frame, gaze_detector, emotion_detector, confidence_threshold, show_landmarks
             )
+            
+            # Save results to database
+            if results:
+                db_manager.save_detection_results(session_id, results, frame_count)
+                total_faces += len(results)
             
             # Display video
             video_placeholder.image(processed_frame, channels="BGR", use_container_width=True)
@@ -88,9 +115,15 @@ def run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, 
     
     finally:
         cap.release()
+        # End database session
+        db_manager.end_session(session_id, total_faces, frame_count)
+        st.success(f"Session completed: {total_faces} faces detected in {frame_count} frames")
 
 def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, confidence_threshold, show_landmarks):
     """Process uploaded image"""
+    # Create database session
+    session_id = db_manager.create_session("image", confidence_threshold, show_landmarks)
+    
     # Load image
     image = Image.open(uploaded_image)
     image_array = np.array(image)
@@ -108,6 +141,15 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, conf
             image_array, gaze_detector, emotion_detector, confidence_threshold, show_landmarks
         )
     
+    # Save results to database
+    total_faces = 0
+    if results:
+        db_manager.save_detection_results(session_id, results)
+        total_faces = len(results)
+    
+    # End database session
+    db_manager.end_session(session_id, total_faces, 1)
+    
     # Display results
     st.subheader("Detection Results")
     col1, col2 = st.columns(2)
@@ -118,15 +160,22 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, conf
     with col2:
         if results:
             display_detection_results(results)
+            st.success(f"Detected {total_faces} face(s) and saved to database")
         else:
             st.warning("No faces detected in the image.")
 
 def process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, confidence_threshold, show_landmarks):
     """Process uploaded video"""
+    # Create database session
+    session_id = db_manager.create_session("video", confidence_threshold, show_landmarks)
+    
     # Save uploaded video to temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
         tmp_file.write(uploaded_video.read())
         tmp_path = tmp_file.name
+    
+    total_faces = 0
+    frames_processed = 0
     
     try:
         # Open video
@@ -160,6 +209,13 @@ def process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, conf
                     frame, gaze_detector, emotion_detector, confidence_threshold, show_landmarks
                 )
                 
+                # Save results to database
+                if results:
+                    db_manager.save_detection_results(session_id, results, frame_count)
+                    total_faces += len(results)
+                
+                frames_processed += 1
+                
                 # Display frame
                 frame_placeholder.image(processed_frame, channels="BGR", use_container_width=True)
                 
@@ -171,7 +227,10 @@ def process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, conf
             progress_bar.progress(frame_count / total_frames)
         
         cap.release()
-        st.success("Video processing completed!")
+        
+        # End database session
+        db_manager.end_session(session_id, total_faces, frames_processed)
+        st.success(f"Video processing completed! {total_faces} faces detected in {frames_processed} processed frames")
     
     finally:
         # Clean up temporary file
@@ -235,6 +294,162 @@ def display_results_content(results):
         
         if i < len(results) - 1:
             st.divider()
+
+def show_analytics_dashboard():
+    """Display analytics dashboard"""
+    st.subheader("📊 Detection Analytics")
+    
+    # Time period selector
+    col1, col2 = st.columns(2)
+    with col1:
+        days = st.selectbox("Time Period", [1, 7, 30], index=1, format_func=lambda x: f"Last {x} day{'s' if x > 1 else ''}")
+    
+    with col2:
+        if st.button("Refresh Data"):
+            st.rerun()
+    
+    # Get analytics data
+    emotion_analytics = db_manager.get_emotion_analytics(days)
+    gaze_analytics = db_manager.get_gaze_analytics(days)
+    
+    # Display emotion analytics
+    if emotion_analytics:
+        st.subheader("🎭 Emotion Distribution")
+        emotion_col1, emotion_col2 = st.columns(2)
+        
+        with emotion_col1:
+            # Create emotion chart data
+            emotions = list(emotion_analytics.keys())
+            counts = [data['total_detections'] for data in emotion_analytics.values()]
+            
+            import pandas as pd
+            emotion_df = pd.DataFrame({
+                'Emotion': emotions,
+                'Count': counts
+            })
+            st.bar_chart(emotion_df.set_index('Emotion'))
+        
+        with emotion_col2:
+            st.markdown("**Emotion Statistics:**")
+            for emotion, data in emotion_analytics.items():
+                st.metric(
+                    f"{emotion.capitalize()}", 
+                    f"{data['total_detections']} detections",
+                    f"{data['average_confidence']:.1%} avg confidence"
+                )
+    else:
+        st.info("No emotion data available for the selected period")
+    
+    # Display gaze analytics
+    if gaze_analytics:
+        st.subheader("👁️ Gaze Direction Distribution")
+        gaze_col1, gaze_col2 = st.columns(2)
+        
+        with gaze_col1:
+            # Create gaze chart data
+            directions = list(gaze_analytics.keys())
+            counts = [data['total_detections'] for data in gaze_analytics.values()]
+            
+            gaze_df = pd.DataFrame({
+                'Direction': directions,
+                'Count': counts
+            })
+            st.bar_chart(gaze_df.set_index('Direction'))
+        
+        with gaze_col2:
+            st.markdown("**Gaze Statistics:**")
+            for direction, data in gaze_analytics.items():
+                st.metric(
+                    f"{direction}", 
+                    f"{data['total_detections']} detections",
+                    f"{data['average_confidence']:.1%} avg confidence"
+                )
+    else:
+        st.info("No gaze data available for the selected period")
+
+def show_analytics():
+    """Show analytics in sidebar"""
+    with st.sidebar:
+        st.subheader("📈 Quick Analytics")
+        
+        # Get recent analytics
+        emotion_data = db_manager.get_emotion_analytics(7)
+        gaze_data = db_manager.get_gaze_analytics(7)
+        
+        if emotion_data:
+            st.markdown("**Top Emotions (7 days):**")
+            sorted_emotions = sorted(emotion_data.items(), key=lambda x: x[1]['total_detections'], reverse=True)
+            for emotion, data in sorted_emotions[:3]:
+                st.text(f"{emotion}: {data['total_detections']}")
+        
+        if gaze_data:
+            st.markdown("**Top Gaze Directions (7 days):**")
+            sorted_gaze = sorted(gaze_data.items(), key=lambda x: x[1]['total_detections'], reverse=True)
+            for direction, data in sorted_gaze[:3]:
+                st.text(f"{direction}: {data['total_detections']}")
+
+def show_session_history():
+    """Show session history in sidebar"""
+    with st.sidebar:
+        st.subheader("📋 Recent Sessions")
+        
+        sessions = db_manager.get_session_history(5)
+        
+        if sessions:
+            for session in sessions:
+                with st.expander(f"{session['type'].title()} - {session['start_time'].strftime('%m/%d %H:%M')}"):
+                    st.text(f"Faces: {session['faces_detected']}")
+                    st.text(f"Frames: {session['frames_processed']}")
+                    st.text(f"Confidence: {session['confidence_threshold']}")
+                    if session['end_time']:
+                        duration = session['end_time'] - session['start_time']
+                        st.text(f"Duration: {duration.total_seconds():.1f}s")
+                    
+                    if st.button(f"View Details", key=f"details_{session['id']}"):
+                        show_session_details(session['id'])
+        else:
+            st.info("No sessions found")
+
+def show_session_details(session_id):
+    """Show detailed session information"""
+    st.subheader("Session Details")
+    
+    details = db_manager.get_detection_details(session_id)
+    
+    if details:
+        st.success(f"Found {len(details)} detection records")
+        
+        # Create DataFrame for detailed view
+        import pandas as pd
+        
+        records = []
+        for detail in details:
+            records.append({
+                'Timestamp': detail['timestamp'].strftime('%H:%M:%S'),
+                'Face ID': detail['face_id'],
+                'Emotion': detail['emotion'],
+                'Emotion Conf': f"{detail['emotion_confidence']:.2f}",
+                'Gaze Direction': detail['gaze_direction'],
+                'Gaze Conf': f"{detail['gaze_confidence']:.2f}",
+                'Head Yaw': f"{detail['head_pose'][1]:.1f}°",
+                'Head Pitch': f"{detail['head_pose'][0]:.1f}°",
+                'Frame': detail['frame_number'] or 'N/A',
+                'Processing (ms)': f"{detail['processing_time_ms']:.1f}" if detail['processing_time_ms'] else 'N/A'
+            })
+        
+        df = pd.DataFrame(records)
+        st.dataframe(df, use_container_width=True)
+        
+        # Download option
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label="Download as CSV",
+            data=csv,
+            file_name=f"session_{session_id}_details.csv",
+            mime="text/csv"
+        )
+    else:
+        st.warning("No detection details found for this session")
 
 if __name__ == "__main__":
     main()
