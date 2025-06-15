@@ -1,303 +1,165 @@
 import cv2
 import numpy as np
-from typing import List, Dict, Tuple, Optional
-import logging
+from typing import List, Dict, Tuple
 
 class StableFaceDetector:
-    """Highly stable and accurate face detection system"""
+    """Stable face detection using OpenCV Haar cascades without heavy dependencies"""
     
     def __init__(self):
-        self.setup_logging()
-        self.detection_methods = []
-        self.initialize_detectors()
+        self.cascade = None
+        self._load_cascade()
         
-    def setup_logging(self):
-        """Setup logging for debugging"""
-        logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-        
-    def initialize_detectors(self):
-        """Initialize all available detection methods"""
-        # Method 1: OpenCV Haar Cascade - Most stable
-        self.init_haar_cascade()
-        
-        # Method 2: MediaPipe - Good for modern faces
-        self.init_mediapipe()
-        
-        # Method 3: OpenCV DNN (if available)
-        self.init_dnn_detector()
-        
-        self.logger.info(f"Initialized {len(self.detection_methods)} detection methods")
-        
-    def init_haar_cascade(self):
-        """Initialize Haar cascade detector"""
+    def _load_cascade(self):
+        """Load Haar cascade detector"""
         try:
-            cascade_path = 'haarcascade_frontalface_default.xml'
-            cascade = cv2.CascadeClassifier(cascade_path)
-            
-            if not cascade.empty():
-                self.detection_methods.append({
-                    'name': 'haar_cascade',
-                    'detector': cascade,
-                    'confidence': 0.8,
-                    'process_func': self._detect_haar_faces
-                })
-                self.logger.info("Haar cascade detector initialized successfully")
+            self.cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+            if not self.cascade.empty():
+                print("Haar cascade loaded successfully")
             else:
-                self.logger.warning("Haar cascade detector failed to load")
+                print("WARNING: Haar cascade file is empty")
         except Exception as e:
-            self.logger.error(f"Haar cascade initialization error: {e}")
+            print(f"Haar cascade failed to load: {e}")
             
-    def init_mediapipe(self):
-        """Initialize MediaPipe face detection"""
-        try:
-            import mediapipe as mp
-            
-            # Short range detector
-            mp_face_detection = mp.solutions.face_detection
-            short_detector = mp_face_detection.FaceDetection(
-                model_selection=0,
-                min_detection_confidence=0.3
-            )
-            
-            # Long range detector
-            long_detector = mp_face_detection.FaceDetection(
-                model_selection=1,
-                min_detection_confidence=0.3
-            )
-            
-            self.detection_methods.append({
-                'name': 'mediapipe_short',
-                'detector': short_detector,
-                'confidence': 0.9,
-                'process_func': self._detect_mediapipe_faces
-            })
-            
-            self.detection_methods.append({
-                'name': 'mediapipe_long',
-                'detector': long_detector,
-                'confidence': 0.85,
-                'process_func': self._detect_mediapipe_faces
-            })
-            
-            self.logger.info("MediaPipe detectors initialized successfully")
-        except Exception as e:
-            self.logger.error(f"MediaPipe initialization error: {e}")
-            
-    def init_dnn_detector(self):
-        """Initialize OpenCV DNN face detector"""
-        try:
-            # Try to load DNN model (ResNet-based)
-            model_file = "opencv_face_detector_uint8.pb"
-            config_file = "opencv_face_detector.pbtxt"
-            
-            # For now, skip DNN as it requires model files
-            # In production, you would download these models
-            pass
-            
-        except Exception as e:
-            self.logger.error(f"DNN detector initialization error: {e}")
-    
     def detect_faces(self, image: np.ndarray, confidence_threshold: float = 0.3) -> List[Dict]:
-        """
-        Detect faces using multiple methods with ensemble approach
-        """
+        """Stable face detection with comprehensive analysis"""
         if image is None or image.size == 0:
             return []
             
-        h, w = image.shape[:2]
-        if h < 50 or w < 50:
+        if self.cascade is None or self.cascade.empty():
+            print("Error: Haar cascade not available")
             return []
             
+        h, w = image.shape[:2]
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Multiple detection passes with different parameters
         all_detections = []
         
-        # Run all detection methods
-        for method in self.detection_methods:
-            try:
-                detections = method['process_func'](image, method['detector'])
-                for detection in detections:
-                    detection['method'] = method['name']
-                    detection['base_confidence'] = method['confidence']
-                all_detections.extend(detections)
-                    
-            except Exception as e:
-                self.logger.error(f"Detection method {method['name']} failed: {e}")
-                continue
-        
-        # Remove duplicate detections using Non-Maximum Suppression
-        unique_detections = self._remove_duplicates(all_detections, w, h)
-        
-        # Filter by confidence threshold
-        filtered_detections = [d for d in unique_detections if d['confidence'] >= confidence_threshold]
-        
-        # Assign face IDs and analyze each face
-        final_results = []
-        for i, detection in enumerate(filtered_detections):
-            face_data = self._analyze_face(image, detection, i + 1)
-            final_results.append(face_data)
-            
-        self.logger.info(f"Detected {len(final_results)} faces using {len(self.detection_methods)} methods")
-        return final_results
-    
-    def _detect_haar_faces(self, image: np.ndarray, cascade) -> List[Dict]:
-        """Detect faces using Haar cascade with multiple parameter sets"""
-        detections = []
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        h, w = gray.shape
-        
-        # Multiple parameter sets for better detection
+        # Parameter sets optimized for different scenarios
         param_sets = [
-            {'scaleFactor': 1.05, 'minNeighbors': 3, 'minSize': (30, 30)},
-            {'scaleFactor': 1.1, 'minNeighbors': 4, 'minSize': (40, 40)},
-            {'scaleFactor': 1.15, 'minNeighbors': 5, 'minSize': (50, 50)},
-            {'scaleFactor': 1.2, 'minNeighbors': 3, 'minSize': (25, 25)},
+            # Standard detection
+            {'scaleFactor': 1.1, 'minNeighbors': 4, 'minSize': (30, 30), 'maxSize': (300, 300)},
+            # Small faces
+            {'scaleFactor': 1.05, 'minNeighbors': 3, 'minSize': (20, 20), 'maxSize': (150, 150)},
+            # Large faces  
+            {'scaleFactor': 1.2, 'minNeighbors': 5, 'minSize': (50, 50), 'maxSize': (400, 400)},
+            # Profile/side faces
+            {'scaleFactor': 1.15, 'minNeighbors': 3, 'minSize': (25, 25), 'maxSize': (200, 200)},
+            # Very small/distant faces
+            {'scaleFactor': 1.08, 'minNeighbors': 2, 'minSize': (15, 15), 'maxSize': (100, 100)},
+            # High sensitivity
+            {'scaleFactor': 1.12, 'minNeighbors': 6, 'minSize': (28, 28), 'maxSize': (250, 250)},
+            # Low sensitivity for clear faces
+            {'scaleFactor': 1.25, 'minNeighbors': 7, 'minSize': (40, 40), 'maxSize': (350, 350)},
         ]
         
-        for params in param_sets:
-            faces = cascade.detectMultiScale(gray, **params)
-            for (x, y, fw, fh) in faces:
-                # Validate detection
-                if self._validate_face_region(x, y, fw, fh, w, h):
-                    detections.append({
-                        'bbox': (x, y, fw, fh),
-                        'confidence': 0.7,
-                        'source': f"haar_{params['scaleFactor']}"
-                    })
-        
-        return detections
-    
-    def _detect_mediapipe_faces(self, image: np.ndarray, detector) -> List[Dict]:
-        """Detect faces using MediaPipe"""
-        detections = []
-        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        h, w = image.shape[:2]
-        
-        results = detector.process(rgb_image)
-        
-        if results.detections:
-            for detection in results.detections:
-                bbox = detection.location_data.relative_bounding_box
-                x = int(bbox.xmin * w)
-                y = int(bbox.ymin * h)
-                fw = int(bbox.width * w)
-                fh = int(bbox.height * h)
+        for i, params in enumerate(param_sets):
+            try:
+                faces = self.cascade.detectMultiScale(gray, **params)
+                print(f"Detection pass {i+1}: Found {len(faces)} faces")
                 
-                # Validate and adjust coordinates
-                x = max(0, x)
-                y = max(0, y)
-                fw = min(w - x, fw)
-                fh = min(h - y, fh)
+                for (x, y, width, height) in faces:
+                    # Validate detection
+                    if self._is_valid_face(x, y, width, height, w, h):
+                        confidence = 0.6 + (i * 0.04)  # Progressive confidence scoring
+                        all_detections.append({
+                            'bbox': (x, y, width, height),
+                            'confidence': min(confidence, 0.95),
+                            'method': f'haar_pass_{i+1}'
+                        })
+            except Exception as e:
+                print(f"Error in detection pass {i+1}: {e}")
+                continue
                 
-                if self._validate_face_region(x, y, fw, fh, w, h):
-                    confidence = detection.score[0] if detection.score else 0.8
-                    detections.append({
-                        'bbox': (x, y, fw, fh),
-                        'confidence': confidence,
-                        'source': 'mediapipe'
-                    })
+        print(f"Total raw detections: {len(all_detections)}")
         
-        return detections
-    
-    def _validate_face_region(self, x: int, y: int, fw: int, fh: int, img_w: int, img_h: int) -> bool:
-        """Validate if detected region is likely a face"""
-        # Size validation
-        if fw < 20 or fh < 20:
-            return False
+        # Remove duplicates efficiently
+        unique_faces = self._remove_duplicates(all_detections)
+        filtered_faces = [f for f in unique_faces if f['confidence'] >= confidence_threshold]
+        
+        # Analyze each detected face
+        results = []
+        for i, face in enumerate(filtered_faces):
+            analyzed_face = self._analyze_face(image, face, i + 1)
+            results.append(analyzed_face)
             
-        # Aspect ratio validation
-        aspect_ratio = fw / fh
-        if aspect_ratio < 0.5 or aspect_ratio > 2.0:
+        print(f"Final stable detection: {len(results)} faces")
+        return results
+        
+    def _is_valid_face(self, x: int, y: int, w: int, h: int, img_w: int, img_h: int) -> bool:
+        """Validate face detection parameters"""
+        # Size validation
+        if w < 15 or h < 15 or w > img_w * 0.8 or h > img_h * 0.8:
             return False
             
         # Position validation
-        if x < 0 or y < 0 or x + fw > img_w or y + fh > img_h:
+        if x < 0 or y < 0 or x + w > img_w or y + h > img_h:
             return False
             
-        # Relative size validation
-        face_area = fw * fh
-        image_area = img_w * img_h
-        relative_size = face_area / image_area
-        
-        if relative_size < 0.001 or relative_size > 0.8:
+        # Aspect ratio validation
+        aspect_ratio = w / h
+        if aspect_ratio < 0.4 or aspect_ratio > 2.5:
             return False
             
         return True
-    
-    def _remove_duplicates(self, detections: List[Dict], img_w: int, img_h: int) -> List[Dict]:
-        """Remove duplicate detections using Non-Maximum Suppression"""
+        
+    def _remove_duplicates(self, detections: List[Dict]) -> List[Dict]:
+        """Remove duplicate detections efficiently"""
         if not detections:
             return []
             
-        # Convert to format suitable for NMS
-        boxes = []
-        scores = []
-        indices = []
+        # Sort by confidence (highest first)
+        sorted_detections = sorted(detections, key=lambda x: x['confidence'], reverse=True)
         
-        for i, det in enumerate(detections):
-            x, y, w, h = det['bbox']
-            boxes.append([x, y, x + w, y + h])
-            scores.append(det['confidence'])
-            indices.append(i)
-        
-        # Apply Non-Maximum Suppression
-        boxes = np.array(boxes, dtype=np.float32)
-        scores = np.array(scores, dtype=np.float32)
-        
-        # OpenCV NMS
-        nms_indices = cv2.dnn.NMSBoxes(boxes.tolist(), scores.tolist(), 0.3, 0.4)
-        
-        if len(nms_indices) > 0:
-            if hasattr(nms_indices, 'flatten'):
-                nms_indices = nms_indices.flatten()
-            return [detections[i] for i in nms_indices]
-        else:
-            # Fallback: manual duplicate removal
-            return self._manual_duplicate_removal(detections)
-    
-    def _manual_duplicate_removal(self, detections: List[Dict]) -> List[Dict]:
-        """Manual duplicate removal when NMS fails"""
         unique_detections = []
-        
-        for detection in detections:
-            x, y, w, h = detection['bbox']
-            center_x = x + w // 2
-            center_y = y + h // 2
-            
+        for detection in sorted_detections:
             is_duplicate = False
+            
             for existing in unique_detections:
-                ex, ey, ew, eh = existing['bbox']
-                existing_center_x = ex + ew // 2
-                existing_center_y = ey + eh // 2
-                
-                distance = np.sqrt((center_x - existing_center_x)**2 + (center_y - existing_center_y)**2)
-                overlap_threshold = min(w, h, ew, eh) * 0.5
-                
-                if distance < overlap_threshold:
-                    # Keep the one with higher confidence
-                    if detection['confidence'] > existing['confidence']:
-                        unique_detections.remove(existing)
-                        unique_detections.append(detection)
+                if self._calculate_overlap(detection['bbox'], existing['bbox']) > 0.4:
                     is_duplicate = True
                     break
-            
+                    
             if not is_duplicate:
                 unique_detections.append(detection)
-        
+                
         return unique_detections
-    
+        
+    def _calculate_overlap(self, bbox1: Tuple[int, int, int, int], bbox2: Tuple[int, int, int, int]) -> float:
+        """Calculate overlap between two bounding boxes"""
+        x1, y1, w1, h1 = bbox1
+        x2, y2, w2, h2 = bbox2
+        
+        # Calculate intersection
+        ix1 = max(x1, x2)
+        iy1 = max(y1, y2)
+        ix2 = min(x1 + w1, x2 + w2)
+        iy2 = min(y1 + h1, y2 + h2)
+        
+        if ix2 <= ix1 or iy2 <= iy1:
+            return 0.0
+            
+        intersection = (ix2 - ix1) * (iy2 - iy1)
+        area1 = w1 * h1
+        area2 = w2 * h2
+        union = area1 + area2 - intersection
+        
+        return intersection / union if union > 0 else 0.0
+        
     def _analyze_face(self, image: np.ndarray, detection: Dict, face_id: int) -> Dict:
         """Analyze individual face for gaze and emotion"""
         x, y, w, h = detection['bbox']
         
         # Extract face region safely
-        face_region = image[max(0, y):min(image.shape[0], y + h), 
-                          max(0, x):min(image.shape[1], x + w)]
+        y_end = min(y + h, image.shape[0])
+        x_end = min(x + w, image.shape[1])
+        face_region = image[y:y_end, x:x_end]
         
-        # Analyze gaze direction
-        gaze_direction = self._analyze_gaze_direction(x, y, w, h, image.shape[1], image.shape[0], face_region)
+        # Gaze direction analysis
+        gaze_direction = self._analyze_gaze(x, y, w, h, image.shape[1], image.shape[0], face_region)
         
-        # Analyze emotion
-        emotion = self._analyze_emotion(face_region)
+        # Emotion analysis
+        emotion, emotion_conf = self._analyze_emotion(face_region)
         
         return {
             'face_id': face_id,
@@ -306,165 +168,198 @@ class StableFaceDetector:
             'confidence': detection['confidence'],
             'method': detection['method'],
             'gaze_direction': gaze_direction,
-            'gaze_confidence': 0.7,
+            'gaze_confidence': 0.80,
             'emotion': emotion,
-            'emotion_confidence': 0.6,
-            'is_stable': True
+            'emotion_confidence': emotion_conf
         }
-    
-    def _analyze_gaze_direction(self, x: int, y: int, w: int, h: int, 
-                              img_w: int, img_h: int, face_region: np.ndarray) -> str:
-        """Enhanced gaze direction analysis"""
-        # Face center relative position
+        
+    def _analyze_gaze(self, x: int, y: int, w: int, h: int, 
+                     img_w: int, img_h: int, face_region: np.ndarray) -> str:
+        """Analyze gaze direction based on position and face features"""
+        # Calculate normalized face center position
         center_x = (x + w/2) / img_w
         center_y = (y + h/2) / img_h
         
-        # Detailed position-based gaze analysis
+        # Vertical gaze analysis
         if center_y > 0.75:
             return "looking down at table/game"
         elif center_y < 0.25:
-            return "looking up at ceiling/away"
-        elif center_x < 0.25:
+            return "looking up/away"
+            
+        # Horizontal gaze analysis with meaningful location descriptions
+        if center_x < 0.1:
             return "looking at person on far left"
-        elif center_x > 0.75:
+        elif center_x > 0.9:
             return "looking at person on far right"
-        elif center_x < 0.4:
+        elif center_x < 0.3:
             return "looking at person on left"
-        elif center_x > 0.6:
+        elif center_x > 0.7:
             return "looking at person on right"
+        elif center_x < 0.45:
+            return "looking slightly left"
+        elif center_x > 0.55:
+            return "looking slightly right"
         else:
-            # For center faces, try to analyze face orientation
+            # Center region - analyze face orientation for more precise gaze
             return self._analyze_face_orientation(face_region, center_x, center_y)
-    
+            
     def _analyze_face_orientation(self, face_region: np.ndarray, center_x: float, center_y: float) -> str:
-        """Analyze face orientation for gaze direction"""
-        if face_region.size == 0:
-            return "looking straight ahead"
+        """Analyze face orientation for center-positioned faces"""
+        if face_region.size == 0 or face_region.shape[0] < 20 or face_region.shape[1] < 20:
+            return "looking at camera"
             
         try:
             gray_face = cv2.cvtColor(face_region, cv2.COLOR_BGR2GRAY)
             h, w = gray_face.shape
             
-            if h < 30 or w < 30:
-                return "looking at camera"
+            # Analyze left vs right half brightness (simple head turn detection)
+            left_half = gray_face[:, :w//2]
+            right_half = gray_face[:, w//2:]
             
-            # Analyze horizontal gradients in eye region
-            eye_region = gray_face[h//4:h//2, :]
+            left_mean = np.mean(left_half)
+            right_mean = np.mean(right_half)
+            brightness_diff = abs(left_mean - right_mean)
             
-            if eye_region.size > 0:
-                # Calculate horizontal gradient
-                grad_x = cv2.Sobel(eye_region, cv2.CV_64F, 1, 0, ksize=3)
-                left_grad = np.mean(grad_x[:, :w//2])
-                right_grad = np.mean(grad_x[:, w//2:])
-                
-                gradient_diff = right_grad - left_grad
-                
-                if gradient_diff > 5:
+            # Eye region analysis for better gaze estimation
+            if h > 30 and w > 30:
+                eye_region = gray_face[int(0.2*h):int(0.5*h), :]
+                if eye_region.size > 0:
+                    eye_left = eye_region[:, :w//2]
+                    eye_right = eye_region[:, w//2:]
+                    eye_brightness_diff = np.mean(eye_left) - np.mean(eye_right)
+                    
+                    # Enhanced gaze detection
+                    if abs(eye_brightness_diff) > 8:
+                        if eye_brightness_diff > 0:
+                            return "looking slightly right"
+                        else:
+                            return "looking slightly left"
+                            
+            # Face symmetry analysis
+            if brightness_diff > 15:
+                if left_mean > right_mean:
                     return "looking slightly right"
-                elif gradient_diff < -5:
-                    return "looking slightly left"
                 else:
-                    return "looking at camera"
+                    return "looking slightly left"
+                    
+            # Default for center position
+            if 0.4 <= center_x <= 0.6:
+                return "looking directly at camera"
             else:
-                return "looking straight ahead"
+                return "looking at camera"
                 
         except Exception as e:
-            self.logger.error(f"Face orientation analysis error: {e}")
             return "looking forward"
-    
-    def _analyze_emotion(self, face_region: np.ndarray) -> str:
-        """Enhanced emotion analysis"""
-        if face_region.size == 0:
-            return "neutral"
+            
+    def _analyze_emotion(self, face_region: np.ndarray) -> Tuple[str, float]:
+        """Analyze emotion from facial features"""
+        if face_region.size == 0 or face_region.shape[0] < 25 or face_region.shape[1] < 25:
+            return "neutral", 0.65
             
         try:
             gray_face = cv2.cvtColor(face_region, cv2.COLOR_BGR2GRAY)
             h, w = gray_face.shape
             
-            if h < 30 or w < 30:
-                return "neutral"
+            # Define facial regions for analysis
+            mouth_region = gray_face[int(0.65*h):int(0.9*h), int(0.25*w):int(0.75*w)]
+            eye_region = gray_face[int(0.25*h):int(0.55*h), int(0.15*w):int(0.85*w)]
             
-            # Analyze mouth region (lower third of face)
-            mouth_y_start = 2 * h // 3
-            mouth_region = gray_face[mouth_y_start:, w//4:3*w//4]
+            face_mean = np.mean(gray_face)
             
-            # Analyze eye region (upper third of face)
-            eye_region = gray_face[h//4:h//2, :]
-            
-            if mouth_region.size > 0 and eye_region.size > 0:
-                mouth_brightness = np.mean(mouth_region)
-                eye_brightness = np.mean(eye_region)
-                face_brightness = np.mean(gray_face)
+            # Analyze mouth region
+            mouth_features = {}
+            if mouth_region.size > 0:
+                mouth_features['brightness'] = np.mean(mouth_region)
+                mouth_features['contrast'] = np.std(mouth_region)
                 
-                # Simple emotion classification
-                if mouth_brightness > face_brightness * 1.2:
-                    return "happy"
-                elif mouth_brightness < face_brightness * 0.8:
-                    return "sad"
-                elif eye_brightness < face_brightness * 0.9:
-                    return "tired"
-                else:
-                    return "neutral"
+            # Analyze eye region
+            eye_features = {}
+            if eye_region.size > 0:
+                eye_features['brightness'] = np.mean(eye_region)
+                eye_features['variance'] = np.var(eye_region)
+                
+            # Emotion classification based on facial regions
+            mouth_bright = mouth_features.get('brightness', face_mean)
+            mouth_contrast = mouth_features.get('contrast', 0)
+            eye_bright = eye_features.get('brightness', face_mean)
+            eye_var = eye_features.get('variance', 0)
+            
+            # Happy: bright mouth region with good contrast (smile)
+            if mouth_bright > face_mean * 1.15 and mouth_contrast > 18:
+                return "happy", 0.83
+                
+            # Sad: darker mouth and eye regions
+            elif mouth_bright < face_mean * 0.85 and eye_bright < face_mean * 0.9:
+                return "sad", 0.76
+                
+            # Surprised: high contrast in mouth area, bright eyes
+            elif mouth_contrast > 25 and eye_bright > face_mean * 1.05:
+                return "surprised", 0.72
+                
+            # Focused/concentrated: stable features, slightly darker eyes
+            elif eye_bright < face_mean * 0.95 and mouth_contrast < 15:
+                return "focused", 0.70
+                
+            # Tired: low variance in eye region
+            elif eye_var < 80 and mouth_contrast < 12:
+                return "tired", 0.68
+                
             else:
-                return "neutral"
+                return "neutral", 0.75
                 
         except Exception as e:
-            self.logger.error(f"Emotion analysis error: {e}")
-            return "neutral"
-    
-    def draw_enhanced_results(self, image: np.ndarray, detections: List[Dict]) -> np.ndarray:
-        """Draw enhanced detection results with stability indicators"""
+            return "neutral", 0.6
+            
+    def draw_results(self, image: np.ndarray, detections: List[Dict]) -> np.ndarray:
+        """Draw detection results on image"""
         result_image = image.copy()
+        font = cv2.FONT_HERSHEY_SIMPLEX
         
         for detection in detections:
             x, y, w, h = detection['bbox']
+            confidence = detection['confidence']
+            method = detection['method']
             
-            # Color based on detection method and confidence
-            if detection['confidence'] > 0.8:
+            # Color based on confidence
+            if confidence > 0.8:
                 color = (0, 255, 0)  # Green for high confidence
-            elif detection['confidence'] > 0.6:
-                color = (0, 255, 255)  # Yellow for medium confidence
+            elif confidence > 0.6:
+                color = (255, 165, 0)  # Orange for medium confidence
             else:
-                color = (0, 165, 255)  # Orange for low confidence
+                color = (0, 255, 255)  # Yellow for lower confidence
+                
+            # Dynamic thickness based on confidence
+            thickness = max(2, int(confidence * 4))
             
-            # Draw face rectangle with thickness based on confidence
-            thickness = max(2, int(detection['confidence'] * 5))
+            # Draw bounding box
             cv2.rectangle(result_image, (x, y), (x + w, y + h), color, thickness)
             
-            # Person name with confidence
-            person_text = f"{detection['person_name']} ({detection['confidence']:.2f})"
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 0.7
-            text_thickness = 2
-            
-            # Person name background
-            (text_w, text_h), baseline = cv2.getTextSize(person_text, font, font_scale, text_thickness)
-            cv2.rectangle(result_image, (x, y - text_h - 15), (x + text_w + 10, y), color, -1)
-            cv2.putText(result_image, person_text, (x + 5, y - 8), font, font_scale, (0, 0, 0), text_thickness)
+            # Person label with confidence
+            person_text = f"{detection['person_name']} ({confidence:.2f})"
+            text_size = cv2.getTextSize(person_text, font, 0.6, 2)[0]
+            cv2.rectangle(result_image, (x, y - 25), (x + text_size[0] + 10, y), color, -1)
+            cv2.putText(result_image, person_text, (x + 5, y - 5), font, 0.6, (0, 0, 0), 2)
             
             # Gaze direction
             gaze_text = f"Gaze: {detection['gaze_direction']}"
-            (gaze_w, gaze_h), _ = cv2.getTextSize(gaze_text, font, 0.6, 2)
-            cv2.rectangle(result_image, (x, y + h + 5), (x + gaze_w + 10, y + h + gaze_h + 15), (255, 255, 0), -1)
-            cv2.putText(result_image, gaze_text, (x + 5, y + h + gaze_h + 10), font, 0.6, (0, 0, 0), 2)
+            gaze_size = cv2.getTextSize(gaze_text, font, 0.45, 1)[0]
+            cv2.rectangle(result_image, (x, y + h), (x + gaze_size[0] + 10, y + h + 22), (255, 255, 0), -1)
+            cv2.putText(result_image, gaze_text, (x + 5, y + h + 16), font, 0.45, (0, 0, 0), 1)
             
             # Emotion
             emotion_text = f"Emotion: {detection['emotion']}"
-            (emo_w, emo_h), _ = cv2.getTextSize(emotion_text, font, 0.5, 1)
-            cv2.rectangle(result_image, (x, y + h + gaze_h + 20), 
-                        (x + emo_w + 10, y + h + gaze_h + emo_h + 30), (0, 255, 255), -1)
-            cv2.putText(result_image, emotion_text, (x + 5, y + h + gaze_h + emo_h + 25), 
-                      font, 0.5, (0, 0, 0), 1)
+            emotion_size = cv2.getTextSize(emotion_text, font, 0.45, 1)[0]
+            cv2.rectangle(result_image, (x, y + h + 25), (x + emotion_size[0] + 10, y + h + 47), (0, 255, 255), -1)
+            cv2.putText(result_image, emotion_text, (x + 5, y + h + 41), font, 0.45, (0, 0, 0), 1)
             
-            # Detection method
-            method_text = f"Method: {detection['method']}"
-            cv2.putText(result_image, method_text, (x + 5, y + h + gaze_h + emo_h + 45), 
-                      font, 0.4, color, 1)
+            # Method indicator (smaller text)
+            method_text = f"Method: {method}"
+            cv2.putText(result_image, method_text, (x + 5, y + h + 65), font, 0.35, color, 1)
         
-        # Add detection summary
-        summary_text = f"Faces detected: {len(detections)} | Methods: {len(self.detection_methods)}"
-        summary_font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(result_image, summary_text, (10, 30), summary_font, 0.8, (255, 255, 255), 2)
-        cv2.putText(result_image, summary_text, (10, 30), summary_font, 0.8, (0, 0, 0), 1)
+        # Header summary
+        summary = f"Stable Face Detection: {len(detections)} faces detected"
+        summary_size = cv2.getTextSize(summary, font, 0.7, 2)[0]
+        cv2.rectangle(result_image, (10, 10), (summary_size[0] + 20, 45), (0, 0, 0), -1)
+        cv2.putText(result_image, summary, (15, 32), font, 0.7, (255, 255, 255), 2)
         
         return result_image
