@@ -12,12 +12,12 @@ class GazeDetector:
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_drawing_styles = mp.solutions.drawing_styles
         
-        # Face mesh model
+        # Face mesh model - increased max faces for better multi-face detection
         self.face_mesh = self.mp_face_mesh.FaceMesh(
-            max_num_faces=5,
+            max_num_faces=10,
             refine_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.3,
+            min_tracking_confidence=0.3
         )
         
         # Eye landmarks indices
@@ -27,6 +27,13 @@ class GazeDetector:
         # Iris landmarks
         self.LEFT_IRIS = [474, 475, 476, 477]
         self.RIGHT_IRIS = [469, 470, 471, 472]
+        
+        # Head pose landmarks for improved gaze accuracy
+        self.NOSE_TIP = 1
+        self.CHIN = 152
+        self.LEFT_CHEEK = 234
+        self.RIGHT_CHEEK = 454
+        self.FOREHEAD = 9
     
     def detect_gaze(self, image: np.ndarray, confidence_threshold: float = 0.5) -> List[Dict]:
         """
@@ -54,7 +61,7 @@ class GazeDetector:
         
         return results
     
-    def _analyze_gaze(self, landmarks, image_shape: Tuple[int, int, int]) -> Dict:
+    def _analyze_gaze(self, landmarks, image_shape) -> Dict:
         """Analyze gaze direction from face landmarks"""
         h, w = image_shape[:2]
         
@@ -66,6 +73,15 @@ class GazeDetector:
             landmarks_points.append([x, y])
         
         landmarks_array = np.array(landmarks_points)
+        
+        # Get head pose landmarks for improved accuracy
+        nose_tip = landmarks_array[self.NOSE_TIP] if len(landmarks_array) > self.NOSE_TIP else None
+        chin = landmarks_array[self.CHIN] if len(landmarks_array) > self.CHIN else None
+        left_cheek = landmarks_array[self.LEFT_CHEEK] if len(landmarks_array) > self.LEFT_CHEEK else None
+        right_cheek = landmarks_array[self.RIGHT_CHEEK] if len(landmarks_array) > self.RIGHT_CHEEK else None
+        
+        # Calculate head pose angles
+        head_pose_angles = self._calculate_head_pose(nose_tip, chin, left_cheek, right_cheek, (w, h))
         
         # Get eye regions
         left_eye_points = landmarks_array[self.LEFT_EYE_LANDMARKS]
@@ -86,14 +102,15 @@ class GazeDetector:
         except:
             pass
         
-        # Calculate gaze direction
-        gaze_direction, gaze_angles, confidence = self._calculate_gaze_direction(
-            left_eye_points, right_eye_points, left_iris_center, right_iris_center
+        # Calculate gaze direction combining eye tracking and head pose
+        gaze_direction, gaze_angles, confidence = self._calculate_combined_gaze_direction(
+            left_eye_points, right_eye_points, left_iris_center, right_iris_center, head_pose_angles
         )
         
         return {
             'gaze_direction': gaze_direction,
             'gaze_angles': gaze_angles,
+            'head_pose_angles': head_pose_angles,
             'confidence': confidence,
             'left_eye_points': left_eye_points,
             'right_eye_points': right_eye_points,
@@ -102,15 +119,48 @@ class GazeDetector:
             'landmarks': landmarks_array
         }
     
-    def _calculate_gaze_direction(self, left_eye: np.ndarray, right_eye: np.ndarray, 
-                                left_iris: Optional[np.ndarray], right_iris: Optional[np.ndarray]) -> Tuple[str, Tuple[float, float], float]:
-        """Calculate gaze direction from eye landmarks"""
+    def _calculate_head_pose(self, nose_tip, chin, left_cheek, right_cheek, image_size) -> Tuple[float, float, float]:
+        """Calculate head pose angles (pitch, yaw, roll) from facial landmarks"""
+        if nose_tip is None or chin is None or left_cheek is None or right_cheek is None:
+            return (0.0, 0.0, 0.0)
+        
+        w, h = image_size
+        
+        # Calculate pitch (up/down head rotation)
+        nose_chin_distance = np.linalg.norm(nose_tip - chin)
+        face_height_estimate = h * 0.3  # Approximate face height as 30% of image
+        pitch_factor = (nose_chin_distance - face_height_estimate * 0.7) / (face_height_estimate * 0.3)
+        pitch = np.clip(pitch_factor * 30, -45, 45)  # Convert to degrees
+        
+        # Calculate yaw (left/right head rotation)
+        cheek_distance_left = np.linalg.norm(nose_tip - left_cheek)
+        cheek_distance_right = np.linalg.norm(nose_tip - right_cheek)
+        yaw_factor = (cheek_distance_right - cheek_distance_left) / max(cheek_distance_left, cheek_distance_right)
+        yaw = np.clip(yaw_factor * 45, -60, 60)  # Convert to degrees
+        
+        # Calculate roll (head tilt)
+        cheek_vector = right_cheek - left_cheek
+        roll = np.degrees(np.arctan2(cheek_vector[1], cheek_vector[0]))
+        roll = np.clip(roll, -30, 30)
+        
+        return (pitch, yaw, roll)
+    
+    def _calculate_combined_gaze_direction(self, left_eye: np.ndarray, right_eye: np.ndarray, 
+                                         left_iris: Optional[np.ndarray], right_iris: Optional[np.ndarray],
+                                         head_pose_angles: Tuple[float, float, float]) -> Tuple[str, Tuple[float, float], float]:
+        """Calculate combined gaze direction using eye tracking and head pose"""
+        head_pitch, head_yaw, head_roll = head_pose_angles
         
         # Calculate eye centers
         left_eye_center = np.mean(left_eye, axis=0)
         right_eye_center = np.mean(right_eye, axis=0)
         
-        # Use iris centers if available, otherwise use eye centers
+        # Calculate eye-based gaze angles
+        eye_yaw = 0.0
+        eye_pitch = 0.0
+        eye_confidence = 0.3
+        
+        # Use iris centers if available for more accurate eye gaze
         if left_iris is not None and right_iris is not None:
             # Calculate relative position of iris in eye
             left_eye_bbox = [np.min(left_eye, axis=0), np.max(left_eye, axis=0)]
@@ -127,29 +177,24 @@ class GazeDetector:
             avg_rel_x = (left_rel_x + right_rel_x) / 2
             avg_rel_y = (left_rel_y + right_rel_y) / 2
             
-            confidence = 0.8
-        else:
-            # Fallback: estimate based on eye shape
-            left_eye_width = np.max(left_eye[:, 0]) - np.min(left_eye[:, 0])
-            left_eye_height = np.max(left_eye[:, 1]) - np.min(left_eye[:, 1])
-            
-            right_eye_width = np.max(right_eye[:, 0]) - np.min(right_eye[:, 0])
-            right_eye_height = np.max(right_eye[:, 1]) - np.min(right_eye[:, 1])
-            
-            # Simple estimation - this is less accurate
-            avg_rel_x = 0.5  # Assume center
-            avg_rel_y = 0.5  # Assume center
-            confidence = 0.4
+            # Convert to eye gaze angles
+            eye_yaw = (avg_rel_x - 0.5) * 30  # -15 to +15 degrees from eyes
+            eye_pitch = (avg_rel_y - 0.5) * 20  # -10 to +10 degrees from eyes
+            eye_confidence = 0.7
         
-        # Convert to angles (approximate)
-        # Map relative position to angles
-        yaw = (avg_rel_x - 0.5) * 60  # -30 to +30 degrees
-        pitch = (avg_rel_y - 0.5) * 40  # -20 to +20 degrees
+        # Combine head pose and eye gaze for final gaze direction
+        # Head pose has more influence on overall gaze direction
+        combined_yaw = head_yaw * 0.7 + eye_yaw * 0.3
+        combined_pitch = head_pitch * 0.7 + eye_pitch * 0.3
         
-        # Determine gaze direction
-        direction = self._get_direction_label(yaw, pitch)
+        # Calculate combined confidence
+        head_confidence = 0.8 if abs(head_yaw) > 5 or abs(head_pitch) > 5 else 0.6
+        combined_confidence = (head_confidence * 0.6 + eye_confidence * 0.4)
         
-        return direction, (pitch, yaw), confidence
+        # Determine gaze direction using combined angles
+        direction = self._get_improved_direction_label(combined_yaw, combined_pitch)
+        
+        return direction, (combined_pitch, combined_yaw), combined_confidence
     
     def _get_direction_label(self, yaw: float, pitch: float) -> str:
         """Convert gaze angles to direction label"""

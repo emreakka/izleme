@@ -80,7 +80,7 @@ def run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, 
             )
             
             # Display video
-            video_placeholder.image(processed_frame, channels="BGR", use_column_width=True)
+            video_placeholder.image(processed_frame, channels="BGR", use_container_width=True)
             
             # Display results
             if results:
@@ -100,7 +100,7 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, conf
         image_array = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
     
     st.subheader("Original Image")
-    st.image(image, use_column_width=True)
+    st.image(image, use_container_width=True)
     
     # Process image
     with st.spinner("Processing image..."):
@@ -113,7 +113,7 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, conf
     col1, col2 = st.columns(2)
     
     with col1:
-        st.image(processed_image, channels="BGR", caption="Processed Image", use_column_width=True)
+        st.image(processed_image, channels="BGR", caption="Processed Image", use_container_width=True)
     
     with col2:
         if results:
@@ -161,7 +161,7 @@ def process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, conf
                 )
                 
                 # Display frame
-                frame_placeholder.image(processed_frame, channels="BGR", use_column_width=True)
+                frame_placeholder.image(processed_frame, channels="BGR", use_container_width=True)
                 
                 # Display results
                 if results:
