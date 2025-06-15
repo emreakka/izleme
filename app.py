@@ -167,10 +167,11 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
     st.subheader("Original Image")
     st.image(image, use_container_width=True)
     
-    # Process image
+    # Process image with robust detection
     with st.spinner("Processing image..."):
-        processed_image, results = enhanced_process_frame(
-            image_array, gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks
+        robust_detector = RobustFaceDetector()
+        processed_image, results = simple_robust_process_frame(
+            image_array, robust_detector, confidence_threshold
         )
     
     # Save results to storage
