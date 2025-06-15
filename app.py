@@ -189,7 +189,8 @@ def display_detection_results(results, placeholder=None):
 def display_results_content(results):
     """Display the actual results content"""
     for i, result in enumerate(results):
-        st.subheader(f"Face {i+1}")
+        face_id = result.get('face_id', i+1)
+        st.subheader(f"Face {face_id}")
         
         col1, col2 = st.columns(2)
         
@@ -204,7 +205,7 @@ def display_results_content(results):
             st.caption(f"Confidence: {emotion_confidence:.2%}")
             
             # Show all emotion scores if available
-            if 'emotion_scores' in result:
+            if 'emotion_scores' in result and result['emotion_scores']:
                 st.markdown("**All Emotions:**")
                 for emotion_name, score in result['emotion_scores'].items():
                     st.text(f"{emotion_name}: {score:.3f}")
@@ -221,8 +222,16 @@ def display_results_content(results):
             # Show gaze angles if available
             if 'gaze_angles' in result:
                 pitch, yaw = result['gaze_angles']
-                st.text(f"Pitch: {pitch:.1f}°")
-                st.text(f"Yaw: {yaw:.1f}°")
+                st.text(f"Eye Pitch: {pitch:.1f}°")
+                st.text(f"Eye Yaw: {yaw:.1f}°")
+            
+            # Show head pose angles if available
+            if 'head_pose_angles' in result:
+                head_pitch, head_yaw, head_roll = result['head_pose_angles']
+                st.markdown("**Head Pose:**")
+                st.text(f"Head Pitch: {head_pitch:.1f}°")
+                st.text(f"Head Yaw: {head_yaw:.1f}°")
+                st.text(f"Head Roll: {head_roll:.1f}°")
         
         if i < len(results) - 1:
             st.divider()

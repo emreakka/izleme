@@ -143,7 +143,7 @@ class GazeDetector:
         roll = np.degrees(np.arctan2(cheek_vector[1], cheek_vector[0]))
         roll = np.clip(roll, -30, 30)
         
-        return (pitch, yaw, roll)
+        return (float(pitch), float(yaw), float(roll))
     
     def _calculate_combined_gaze_direction(self, left_eye: np.ndarray, right_eye: np.ndarray, 
                                          left_iris: Optional[np.ndarray], right_iris: Optional[np.ndarray],
@@ -192,15 +192,15 @@ class GazeDetector:
         combined_confidence = (head_confidence * 0.6 + eye_confidence * 0.4)
         
         # Determine gaze direction using combined angles
-        direction = self._get_improved_direction_label(combined_yaw, combined_pitch)
+        direction = self._get_direction_label(combined_yaw, combined_pitch)
         
-        return direction, (combined_pitch, combined_yaw), combined_confidence
+        return direction, (float(combined_pitch), float(combined_yaw)), combined_confidence
     
     def _get_direction_label(self, yaw: float, pitch: float) -> str:
-        """Convert gaze angles to direction label"""
-        # Thresholds for direction classification
-        yaw_threshold = 15
-        pitch_threshold = 10
+        """Convert gaze angles to direction label with improved thresholds"""
+        # More sensitive thresholds for better accuracy
+        yaw_threshold = 8
+        pitch_threshold = 6
         
         # Horizontal direction
         if yaw < -yaw_threshold:
@@ -218,7 +218,7 @@ class GazeDetector:
         else:
             vertical = "Center"
         
-        # Combine directions
+        # Combine directions with better logic
         if horizontal == "Center" and vertical == "Center":
             return "Center"
         elif horizontal == "Center":
@@ -278,7 +278,14 @@ class GazeDetector:
         # Draw arrow
         cv2.arrowedLine(image, tuple(start_point), end_point, color, 2, tipLength=0.3)
         
-        # Add text label
+        # Add text label with head pose info
         text_pos = (start_point[0] - 50, start_point[1] - 20)
         cv2.putText(image, f"Gaze: {gaze_info['gaze_direction']}", text_pos, 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        
+        # Add head pose angles if available
+        if 'head_pose_angles' in gaze_info:
+            head_pitch, head_yaw, head_roll = gaze_info['head_pose_angles']
+            head_text_pos = (start_point[0] - 50, start_point[1] - 45)
+            cv2.putText(image, f"Head: Y{head_yaw:.1f}° P{head_pitch:.1f}°", head_text_pos, 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)

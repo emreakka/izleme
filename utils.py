@@ -30,41 +30,66 @@ def process_frame(frame: np.ndarray, gaze_detector: GazeDetector, emotion_detect
         # Detect emotions
         emotion_results = emotion_detector.detect_emotion(frame, confidence_threshold)
         
-        # Combine results by matching faces (simple approach - assume same order)
-        max_faces = max(len(gaze_results), len(emotion_results))
+        # Improved face matching using spatial proximity
+        all_faces = []
         
-        for i in range(max_faces):
-            result = {}
-            
-            # Add gaze information
-            if i < len(gaze_results):
-                gaze_info = gaze_results[i]
-                result.update({
-                    'gaze_direction': gaze_info['gaze_direction'],
-                    'gaze_angles': gaze_info['gaze_angles'],
-                    'gaze_confidence': gaze_info['confidence']
-                })
+        # Collect all face detections with their positions
+        for i, gaze_info in enumerate(gaze_results):
+            face_center = np.mean(gaze_info['landmarks'], axis=0) if 'landmarks' in gaze_info else None
+            all_faces.append({
+                'type': 'gaze',
+                'index': i,
+                'data': gaze_info,
+                'center': face_center
+            })
+        
+        for i, emotion_info in enumerate(emotion_results):
+            face_center = np.mean(emotion_info['landmarks'], axis=0) if 'landmarks' in emotion_info else None
+            all_faces.append({
+                'type': 'emotion',
+                'index': i,
+                'data': emotion_info,
+                'center': face_center
+            })
+        
+        # Group faces by proximity
+        matched_faces = []
+        used_emotion_indices = set()
+        used_gaze_indices = set()
+        
+        for gaze_face in [f for f in all_faces if f['type'] == 'gaze']:
+            if gaze_face['index'] in used_gaze_indices:
+                continue
                 
-                # Draw gaze overlay
-                processed_frame = gaze_detector.draw_gaze_overlay(processed_frame, gaze_info)
-            else:
-                result.update({
-                    'gaze_direction': 'Unknown',
-                    'gaze_angles': (0.0, 0.0),
-                    'gaze_confidence': 0.0
-                })
+            result = {
+                'face_id': len(matched_faces) + 1,
+                'gaze_direction': gaze_face['data']['gaze_direction'],
+                'gaze_angles': gaze_face['data']['gaze_angles'],
+                'gaze_confidence': gaze_face['data']['confidence'],
+                'head_pose_angles': gaze_face['data'].get('head_pose_angles', (0.0, 0.0, 0.0))
+            }
             
-            # Add emotion information
-            if i < len(emotion_results):
-                emotion_info = emotion_results[i]
+            # Find closest emotion detection
+            best_emotion_match = None
+            min_distance = float('inf')
+            
+            if gaze_face['center'] is not None:
+                for emotion_face in [f for f in all_faces if f['type'] == 'emotion' and f['index'] not in used_emotion_indices]:
+                    if emotion_face['center'] is not None:
+                        distance = np.linalg.norm(gaze_face['center'] - emotion_face['center'])
+                        if distance < min_distance and distance < 100:  # Within 100 pixels
+                            min_distance = distance
+                            best_emotion_match = emotion_face
+            
+            if best_emotion_match:
                 result.update({
-                    'emotion': emotion_info['emotion'],
-                    'emotion_confidence': emotion_info['confidence'],
-                    'emotion_scores': emotion_info['emotion_scores']
+                    'emotion': best_emotion_match['data']['emotion'],
+                    'emotion_confidence': best_emotion_match['data']['confidence'],
+                    'emotion_scores': best_emotion_match['data']['emotion_scores']
                 })
-                
+                used_emotion_indices.add(best_emotion_match['index'])
                 # Draw emotion overlay
-                processed_frame = emotion_detector.draw_emotion_overlay(processed_frame, emotion_info)
+                processed_frame = emotion_detector.draw_emotion_overlay(processed_frame, best_emotion_match['data'])
             else:
                 result.update({
                     'emotion': 'Unknown',
@@ -72,7 +97,28 @@ def process_frame(frame: np.ndarray, gaze_detector: GazeDetector, emotion_detect
                     'emotion_scores': {}
                 })
             
-            results.append(result)
+            # Draw gaze overlay
+            processed_frame = gaze_detector.draw_gaze_overlay(processed_frame, gaze_face['data'])
+            used_gaze_indices.add(gaze_face['index'])
+            matched_faces.append(result)
+        
+        # Add remaining emotion detections that weren't matched
+        for emotion_face in [f for f in all_faces if f['type'] == 'emotion' and f['index'] not in used_emotion_indices]:
+            result = {
+                'face_id': len(matched_faces) + 1,
+                'gaze_direction': 'Unknown',
+                'gaze_angles': (0.0, 0.0),
+                'gaze_confidence': 0.0,
+                'head_pose_angles': (0.0, 0.0, 0.0),
+                'emotion': emotion_face['data']['emotion'],
+                'emotion_confidence': emotion_face['data']['confidence'],
+                'emotion_scores': emotion_face['data']['emotion_scores']
+            }
+            # Draw emotion overlay
+            processed_frame = emotion_detector.draw_emotion_overlay(processed_frame, emotion_face['data'])
+            matched_faces.append(result)
+        
+        results = matched_faces
         
         # Draw additional landmarks if requested
         if show_landmarks and (gaze_results or emotion_results):
