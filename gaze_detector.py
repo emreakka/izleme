@@ -12,12 +12,12 @@ class GazeDetector:
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_drawing_styles = mp.solutions.drawing_styles
         
-        # Face mesh model - increased max faces for better multi-face detection
+        # Face mesh model - optimized for better multi-face detection
         self.face_mesh = self.mp_face_mesh.FaceMesh(
-            max_num_faces=10,
+            max_num_faces=15,
             refine_landmarks=True,
-            min_detection_confidence=0.3,
-            min_tracking_confidence=0.3
+            min_detection_confidence=0.2,
+            min_tracking_confidence=0.2
         )
         
         # Eye landmarks indices

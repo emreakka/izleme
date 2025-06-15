@@ -17,15 +17,15 @@ class FaceRecognitionSystem:
         # Face detection model
         self.face_detection = self.mp_face_detection.FaceDetection(
             model_selection=1,  # Use full range model for better accuracy
-            min_detection_confidence=0.7
+            min_detection_confidence=0.4
         )
         
         # Face mesh for feature extraction
         self.face_mesh = self.mp_face_mesh.FaceMesh(
-            max_num_faces=10,
+            max_num_faces=15,
             refine_landmarks=True,
-            min_detection_confidence=0.7,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.4,
+            min_tracking_confidence=0.3
         )
         
         # Storage for known faces

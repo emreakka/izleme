@@ -9,6 +9,7 @@ from gaze_detector import GazeDetector
 from emotion_detector import EmotionDetector
 from face_recognition import FaceRecognitionSystem
 from utils import process_frame, draw_results
+from enhanced_utils import enhanced_process_frame
 from simple_storage import simple_storage
 
 # Initialize detectors
@@ -165,7 +166,7 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
     
     # Process image
     with st.spinner("Processing image..."):
-        processed_image, results = process_frame(
+        processed_image, results = enhanced_process_frame(
             image_array, gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks
         )
     
@@ -233,8 +234,8 @@ def process_uploaded_video(uploaded_video, gaze_detector, emotion_detector, face
             
             # Process every 5th frame for performance
             if frame_count % 5 == 0:
-                processed_frame, results = process_frame(
-                    frame, gaze_detector, emotion_detector, confidence_threshold, show_landmarks
+                processed_frame, results = enhanced_process_frame(
+                    frame, gaze_detector, emotion_detector, face_recognition, confidence_threshold, show_landmarks
                 )
                 
                 # Save results to storage
