@@ -173,11 +173,11 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
     st.subheader("Original Image")
     st.image(image, use_container_width=True)
     
-    # Process image with enhanced face detection
+    # Process image with fast face detection
     with st.spinner("Processing image..."):
-        enhanced_detector = EnhancedDetector()
-        detections = enhanced_detector.detect_faces(image_array, confidence_threshold)
-        processed_image = enhanced_detector.draw_results(image_array, detections)
+        fast_detector = FastDetector()
+        detections = fast_detector.detect_faces(image_array, confidence_threshold)
+        processed_image = fast_detector.draw_results(image_array, detections)
         
         # Convert to standard format for storage
         results = []
