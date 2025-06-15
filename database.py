@@ -10,7 +10,16 @@ import json
 
 # Database configuration
 DATABASE_URL = os.getenv('DATABASE_URL')
-engine = create_engine(DATABASE_URL)
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
+
+# Add connection pool settings for better reliability
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    connect_args={"sslmode": "prefer"}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -86,18 +95,24 @@ class DatabaseManager:
         self.SessionLocal = SessionLocal
         Base.metadata.create_all(bind=engine)
     
-    def get_db(self) -> Session:
-        """Get database session"""
-        db = self.SessionLocal()
+    def get_db(self):
+        """Get database session with error handling"""
         try:
+            db = self.SessionLocal()
+            # Test the connection
+            from sqlalchemy import text
+            db.execute(text("SELECT 1"))
             return db
-        except Exception:
-            db.close()
-            raise
+        except Exception as e:
+            print(f"Database connection error: {e}")
+            return None
     
     def create_session(self, session_type: str, confidence_threshold: float, show_landmarks: bool) -> str:
         """Create a new detection session"""
         db = self.get_db()
+        if not db:
+            return "offline_session"  # Return fallback ID when DB is unavailable
+        
         try:
             session = DetectionSession(
                 session_type=session_type,
@@ -108,25 +123,47 @@ class DatabaseManager:
             db.commit()
             db.refresh(session)
             return str(session.id)
+        except Exception as e:
+            print(f"Error creating session: {e}")
+            db.rollback()
+            return "offline_session"
         finally:
             db.close()
     
     def end_session(self, session_id: str, total_faces: int, total_frames: int):
         """End a detection session"""
+        if session_id == "offline_session":
+            return  # Skip if offline
+            
         db = self.get_db()
+        if not db:
+            return
+            
         try:
             session = db.query(DetectionSession).filter(DetectionSession.id == session_id).first()
             if session:
-                session.session_end = datetime.utcnow()
-                session.total_faces_detected = total_faces
-                session.total_frames_processed = total_frames
+                # Use update() instead of direct assignment
+                db.query(DetectionSession).filter(DetectionSession.id == session_id).update({
+                    DetectionSession.session_end: datetime.utcnow(),
+                    DetectionSession.total_faces_detected: total_faces,
+                    DetectionSession.total_frames_processed: total_frames
+                })
                 db.commit()
+        except Exception as e:
+            print(f"Error ending session: {e}")
+            db.rollback()
         finally:
             db.close()
     
     def save_detection_results(self, session_id: str, results: List[Dict], frame_number: Optional[int] = None):
         """Save detection results to database"""
+        if session_id == "offline_session":
+            return  # Skip if offline
+            
         db = self.get_db()
+        if not db:
+            return
+            
         try:
             detections = []
             start_time = datetime.utcnow()
@@ -161,6 +198,9 @@ class DatabaseManager:
                 detection.processing_time_ms = processing_time
             db.commit()
             
+        except Exception as e:
+            print(f"Error saving detection results: {e}")
+            db.rollback()
         finally:
             db.close()
     

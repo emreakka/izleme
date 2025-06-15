@@ -8,7 +8,7 @@ import time
 from gaze_detector import GazeDetector
 from emotion_detector import EmotionDetector
 from utils import process_frame, draw_results
-from database import db_manager
+from simple_storage import simple_storage
 
 # Initialize detectors
 @st.cache_resource
@@ -69,8 +69,8 @@ def run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, 
     """Run real-time webcam detection"""
     st.info("Starting webcam... Press 'Stop' to end detection.")
     
-    # Create database session
-    session_id = db_manager.create_session("webcam", confidence_threshold, show_landmarks)
+    # Create storage session
+    session_id = simple_storage.create_session("webcam", confidence_threshold, show_landmarks)
     
     # Create placeholders for video and results
     video_placeholder = st.empty()
@@ -101,9 +101,9 @@ def run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, 
                 frame, gaze_detector, emotion_detector, confidence_threshold, show_landmarks
             )
             
-            # Save results to database
+            # Save results to storage
             if results:
-                db_manager.save_detection_results(session_id, results, frame_count)
+                simple_storage.save_detection_results(session_id, results, frame_count)
                 total_faces += len(results)
             
             # Display video
@@ -115,14 +115,14 @@ def run_webcam_detection(gaze_detector, emotion_detector, confidence_threshold, 
     
     finally:
         cap.release()
-        # End database session
-        db_manager.end_session(session_id, total_faces, frame_count)
+        # End storage session
+        simple_storage.end_session(session_id, total_faces, frame_count)
         st.success(f"Session completed: {total_faces} faces detected in {frame_count} frames")
 
 def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, confidence_threshold, show_landmarks):
     """Process uploaded image"""
-    # Create database session
-    session_id = db_manager.create_session("image", confidence_threshold, show_landmarks)
+    # Create storage session
+    session_id = simple_storage.create_session("image", confidence_threshold, show_landmarks)
     
     # Load image
     image = Image.open(uploaded_image)
@@ -141,14 +141,14 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, conf
             image_array, gaze_detector, emotion_detector, confidence_threshold, show_landmarks
         )
     
-    # Save results to database
+    # Save results to storage
     total_faces = 0
     if results:
-        db_manager.save_detection_results(session_id, results)
+        simple_storage.save_detection_results(session_id, results)
         total_faces = len(results)
     
-    # End database session
-    db_manager.end_session(session_id, total_faces, 1)
+    # End storage session
+    simple_storage.end_session(session_id, total_faces, 1)
     
     # Display results
     st.subheader("Detection Results")
