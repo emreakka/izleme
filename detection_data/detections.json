@@ -27850,5 +27850,39 @@
     "emotion_confidence": 0.7,
     "emotion_scores": {},
     "frame_number": null
+  },
+  {
+    "id": "61ca02e6-e922-4484-a364-de5d23c42419",
+    "session_id": "1c6c96fb-5fa0-41a8-90ef-281a452b9eb8",
+    "timestamp": "2025-06-16T00:03:43.900935",
+    "face_id": 1,
+    "gaze_direction": "looking up/away",
+    "gaze_pitch": 0.0,
+    "gaze_yaw": 0.0,
+    "gaze_confidence": 0.85,
+    "head_pitch": 0.0,
+    "head_yaw": 0.0,
+    "head_roll": 0.0,
+    "emotion": "focused",
+    "emotion_confidence": 0.82,
+    "emotion_scores": {},
+    "frame_number": null
+  },
+  {
+    "id": "e70c2be9-0290-4577-b7ec-7ca4bba5a361",
+    "session_id": "1c6c96fb-5fa0-41a8-90ef-281a452b9eb8",
+    "timestamp": "2025-06-16T00:03:43.900968",
+    "face_id": 2,
+    "gaze_direction": "looking at person on right",
+    "gaze_pitch": 0.0,
+    "gaze_yaw": 0.0,
+    "gaze_confidence": 0.85,
+    "head_pitch": 0.0,
+    "head_yaw": 0.0,
+    "head_roll": 0.0,
+    "emotion": "excited",
+    "emotion_confidence": 0.78,
+    "emotion_scores": {},
+    "frame_number": null
   }
 ]
