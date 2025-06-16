@@ -84,14 +84,19 @@ class MultiLibraryFaceDetector:
             self.detectors['opencv_cascades'] = []
             for cascade_file in cascade_files:
                 try:
-                    # Try loading from cv2.data first
-                    cascade_path = cv2.data.haarcascades + cascade_file
-                    cascade = cv2.CascadeClassifier(cascade_path)
-                    if not cascade.empty():
-                        self.detectors['opencv_cascades'].append({
-                            'detector': cascade,
-                            'name': cascade_file.replace('.xml', '')
-                        })
+                    # Try loading from cv2 data directory
+                    try:
+                        cascade_path = cv2.data.haarcascades + cascade_file
+                        cascade = cv2.CascadeClassifier(cascade_path)
+                        if not cascade.empty():
+                            self.detectors['opencv_cascades'].append({
+                                'detector': cascade,
+                                'name': cascade_file.replace('.xml', '')
+                            })
+                            continue
+                    except AttributeError:
+                        # cv2.data not available, try alternative
+                        pass
                 except:
                     # Try loading from local file
                     try:
@@ -111,13 +116,21 @@ class MultiLibraryFaceDetector:
         # 4. OpenCV DNN Face Detector
         try:
             # Download DNN models if not present
-            self.download_dnn_models()
-            
-            net = cv2.dnn.readNetFromTensorflow('opencv_face_detector_uint8.pb', 'opencv_face_detector.pbtxt')
-            self.detectors['opencv_dnn'] = net
-            st.success("OpenCV DNN detector initialized")
+            if self.download_dnn_models():
+                net = cv2.dnn.readNetFromTensorflow('opencv_face_detector_uint8.pb', 'opencv_face_detector.pbtxt')
+                self.detectors['opencv_dnn'] = net
+                st.success("OpenCV DNN detector initialized")
+            else:
+                st.info("OpenCV DNN models not available - using other detection methods")
         except Exception as e:
-            st.warning(f"OpenCV DNN initialization failed: {e}")
+            st.info(f"OpenCV DNN not available: {e}")
+            # Remove any partially downloaded files
+            for filename in ['opencv_face_detector_uint8.pb', 'opencv_face_detector.pbtxt']:
+                if os.path.exists(filename):
+                    try:
+                        os.remove(filename)
+                    except:
+                        pass
             
     def download_dnn_models(self):
         """Download OpenCV DNN models if not present"""
@@ -126,14 +139,34 @@ class MultiLibraryFaceDetector:
             'opencv_face_detector.pbtxt': 'https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/opencv_face_detector.pbtxt'
         }
         
+        # Check if both files exist and are valid
+        all_exist = True
+        for filename in models.keys():
+            if not os.path.exists(filename) or os.path.getsize(filename) < 1000:  # Basic size check
+                all_exist = False
+                break
+        
+        if all_exist:
+            return True
+            
+        # Try to download missing files
         for filename, url in models.items():
-            if not os.path.exists(filename):
+            if not os.path.exists(filename) or os.path.getsize(filename) < 1000:
                 try:
-                    response = requests.get(url)
+                    response = requests.get(url, timeout=30)
+                    response.raise_for_status()
                     with open(filename, 'wb') as f:
                         f.write(response.content)
                 except Exception as e:
-                    st.warning(f"Failed to download {filename}: {e}")
+                    st.info(f"Could not download {filename}: {e}")
+                    return False
+        
+        # Verify files were downloaded successfully
+        for filename in models.keys():
+            if not os.path.exists(filename) or os.path.getsize(filename) < 1000:
+                return False
+                
+        return True
     
     def detect_faces(self, image: np.ndarray, confidence_threshold: float = 0.3) -> List[Dict]:
         """Detect faces using all available methods and combine results"""
@@ -303,8 +336,16 @@ class MultiLibraryFaceDetector:
         
         unique_detections = []
         if len(indices) > 0:
-            for i in indices.flatten():
-                unique_detections.append(detections[i])
+            # Handle both old and new OpenCV versions
+            if isinstance(indices, np.ndarray):
+                if indices.ndim == 2:
+                    indices = indices.flatten()
+                for i in indices:
+                    unique_detections.append(detections[i])
+            else:
+                # indices is a list
+                for i in indices:
+                    unique_detections.append(detections[i])
                 
         return unique_detections
     
