@@ -123,7 +123,7 @@ class UltimateFaceDetector:
             'haarcascade_frontalface_alt.xml', 
             'haarcascade_frontalface_alt2.xml',
             'haarcascade_profileface.xml',
-            'haarcascade_anime_face.xml'  # For anime/cartoon faces
+
         ]
         
         self.detectors['opencv_cascades'] = []
@@ -810,6 +810,10 @@ class EnhancedStorage:
                 json.dump(self.sessions, f, indent=2)
         except Exception as e:
             st.error(f"Failed to save session: {e}")
+    
+    def get_all_sessions(self) -> List[Dict]:
+        """Get all sessions"""
+        return self.sessions
     
     def get_analytics(self) -> Dict:
         """Get comprehensive analytics"""
