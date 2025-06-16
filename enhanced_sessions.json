@@ -1,0 +1,23 @@
+[
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:53:58.410340",
+    "faces_detected": 12,
+    "processing_time": 13.9631507396698,
+    "detection_methods": [
+      "mtcnn",
+      "opencv_haarcascade_frontalface_alt2",
+      "opencv_haarcascade_frontalface_default"
+    ],
+    "avg_confidence": 0.8521310706933339,
+    "detections": [
+      {
+        "x": 1231,
+        "y": 1020,
+        "w": 188,
+        "h": 217,
+        "confidence": 0.9995869994163513,
+        "method": "mtcnn",
+        "keypoints": {
+          "nose": [
+            
