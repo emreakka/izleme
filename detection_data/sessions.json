@@ -288,5 +288,25 @@
     "total_frames_processed": 1,
     "confidence_threshold": 0.5,
     "show_landmarks": true
+  },
+  {
+    "id": "5049b978-d30d-4088-a353-b82f0aa6be30",
+    "session_start": "2025-06-16T00:19:21.581332",
+    "session_end": "2025-06-16T00:19:57.464859",
+    "session_type": "video",
+    "total_faces_detected": 287,
+    "total_frames_processed": 246,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
+  },
+  {
+    "id": "acb8fd77-3c74-413b-9429-fac01dea26ee",
+    "session_start": "2025-06-16T00:20:03.556552",
+    "session_end": "2025-06-16T00:20:50.821746",
+    "session_type": "video",
+    "total_faces_detected": 287,
+    "total_frames_processed": 246,
+    "confidence_threshold": 0.5,
+    "show_landmarks": true
   }
 ]
