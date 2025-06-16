@@ -204,6 +204,37 @@ class SimpleStorage:
         # Sort by timestamp
         session_detections.sort(key=lambda x: x['timestamp'])
         return session_detections
+    
+    def get_all_sessions(self) -> List[Dict]:
+        """Get all sessions with full details"""
+        sessions = self._load_json(self.sessions_file)
+        result = []
+        
+        for session in sessions:
+            try:
+                start_time = datetime.fromisoformat(session['session_start'].replace('Z', '+00:00'))
+                end_time = None
+                if session.get('session_end'):
+                    end_time = datetime.fromisoformat(session['session_end'].replace('Z', '+00:00'))
+                
+                result.append({
+                    'id': session['id'],
+                    'timestamp': session['session_start'],
+                    'filename': session.get('filename', 'Unknown'),
+                    'faces_detected': session.get('total_faces_detected', 0),
+                    'processing_time': session.get('processing_time', 0.0),
+                    'detections': session.get('detections', [])
+                })
+            except Exception:
+                continue
+        
+        return result
+    
+    def save_session(self, session_data: Dict):
+        """Save a complete session with detection results"""
+        sessions = self._load_json(self.sessions_file)
+        sessions.append(session_data)
+        self._save_json(self.sessions_file, sessions)
 
 # Create global instance
 simple_storage = SimpleStorage()

@@ -207,7 +207,6 @@ class CoreFaceDetector:
             all_detections.extend(self._detect_with_mediapipe(rgb_image))
             all_detections.extend(self._detect_with_mtcnn(rgb_image))
             all_detections.extend(self._detect_with_tensorflow(image))
-            all_detections.extend(self._detect_with_dlib(gray_image))
             
         elif method == "MTCNN Only":
             all_detections = self._detect_with_mtcnn(rgb_image)
@@ -405,49 +404,7 @@ class CoreFaceDetector:
         
         return detections
     
-    def _detect_with_dlib(self, gray_image: np.ndarray) -> List[Dict]:
-        """Detect faces using dlib"""
-        detections = []
-        
-        # HOG-based detector
-        if self.detectors.get('dlib_hog'):
-            try:
-                faces = self.detectors['dlib_hog'](gray_image)
-                
-                for face in faces:
-                    x, y, w, h = face.left(), face.top(), face.width(), face.height()
-                    
-                    detections.append({
-                        'x': x, 'y': y, 'w': w, 'h': h,
-                        'confidence': 0.85,  # dlib HOG is reliable
-                        'method': 'dlib_hog',
-                        'source': 'dlib'
-                    })
-                    
-            except Exception as e:
-                self.logger.warning(f"dlib HOG detection failed: {e}")
-        
-        # CNN-based detector
-        if self.detectors.get('dlib_cnn'):
-            try:
-                faces = self.detectors['dlib_cnn'](gray_image)
-                
-                for face in faces:
-                    rect = face.rect
-                    confidence = face.confidence
-                    x, y, w, h = rect.left(), rect.top(), rect.width(), rect.height()
-                    
-                    detections.append({
-                        'x': x, 'y': y, 'w': w, 'h': h,
-                        'confidence': confidence,
-                        'method': 'dlib_cnn',
-                        'source': 'dlib'
-                    })
-                    
-            except Exception as e:
-                self.logger.warning(f"dlib CNN detection failed: {e}")
-        
-        return detections
+# dlib detection removed - not available
     
     def _remove_duplicate_detections(self, detections: List[Dict], image_shape: Tuple[int, int, int]) -> List[Dict]:
         """Remove duplicate detections using advanced clustering"""
@@ -570,22 +527,7 @@ class CoreFaceDetector:
                 face_area = w * h
                 detection['relative_size'] = face_area / img_area
                 
-                # Add landmarks if available from dlib
-                if self.detectors.get('dlib_landmarks'):
-                    try:
-                        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                        rect = dlib.rectangle(x, y, x + w, y + h)
-                        landmarks = self.detectors['dlib_landmarks'](gray_image, rect)
-                        
-                        landmark_points = []
-                        for i in range(68):
-                            point = landmarks.part(i)
-                            landmark_points.append([point.x, point.y])
-                        
-                        detection['facial_landmarks'] = landmark_points
-                        
-                    except Exception:
-                        pass
+                # dlib landmarks not available - skipped
             
         except Exception as e:
             self.logger.warning(f"Detection enhancement failed: {e}")

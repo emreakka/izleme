@@ -22,7 +22,7 @@ args = "install_dependencies"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Advanced Vision App"
+args = "Computer Vision App"
 
 [[workflows.workflow]]
 name = "install_dependencies"
@@ -33,12 +33,12 @@ task = "shell.exec"
 args = "uv add opencv-python mediapipe"
 
 [[workflows.workflow]]
-name = "Advanced Vision App"
+name = "Computer Vision App"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run main_app.py --server.port 5000"
+args = "streamlit run simplified_app.py --server.port 5000"
 waitForPort = 5000
 
 [[ports]]
