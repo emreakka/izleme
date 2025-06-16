@@ -1,0 +1,72 @@
+[
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:38:44.511132",
+    "faces_detected": 0,
+    "processing_time": 0.11607146263122559,
+    "detections": []
+  },
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:38:57.840234",
+    "faces_detected": 0,
+    "processing_time": 0.3374142646789551,
+    "detections": []
+  },
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:42:02.963005",
+    "faces_detected": 0,
+    "processing_time": 0.10239362716674805,
+    "detections": []
+  },
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:42:10.520225",
+    "faces_detected": 0,
+    "processing_time": 0.10378241539001465,
+    "detections": []
+  },
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:42:11.074593",
+    "faces_detected": 0,
+    "processing_time": 0.09554219245910645,
+    "detections": []
+  },
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:43:36.007178",
+    "faces_detected": 0,
+    "processing_time": 0.13739943504333496,
+    "detections": []
+  },
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:43:37.042501",
+    "faces_detected": 0,
+    "processing_time": 0.09907650947570801,
+    "detections": []
+  },
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:43:37.872013",
+    "faces_detected": 0,
+    "processing_time": 0.10191226005554199,
+    "detections": []
+  },
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:43:47.666610",
+    "faces_detected": 0,
+    "processing_time": 0.10036373138427734,
+    "detections": []
+  },
+  {
+    "filename": "d2a82c46-630c-40eb-a70e-b41a4b523528.jpg",
+    "timestamp": "2025-06-16T00:43:49.050765",
+    "faces_detected": 0,
+    "processing_time": 0.10309290885925293,
+    "detections": []
+  }
+]
