@@ -1,0 +1,24 @@
+[
+  {
+    "filename": "2b3b52f1-b4f7-4886-bb50-9ba84c7f38db.jpg",
+    "faces_detected": 34,
+    "processing_time": 10.424115180969238,
+    "detection_methods": [
+      "mediapipe",
+      "mtcnn",
+      "opencv_cascades",
+      "edge_detection",
+      "template_matching"
+    ],
+    "avg_confidence": 0.4500319456660712,
+    "detections": [
+      {
+        "x": 360,
+        "y": 352,
+        "w": 135,
+        "h": 182,
+        "confidence": 0.9551830191450232,
+        "method": "mtcnn",
+        "keypoints": {
+          "nose": [
+            

@@ -13,19 +13,25 @@ import requests
 from io import BytesIO
 import base64
 
-# Configure Streamlit
+# Configure Streamlit with mobile optimization
 st.set_page_config(
     page_title="Ultimate Computer Vision Analysis",
     page_icon="🎯",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
-# Custom CSS for enhanced UI
+# Add mobile viewport meta tag for proper mobile rendering
+st.markdown("""
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+""", unsafe_allow_html=True)
+
+# Mobile-responsive CSS for enhanced UI
 st.markdown("""
 <style>
+    /* Main header - responsive */
     .main-header {
-        font-size: 3rem;
+        font-size: clamp(1.5rem, 4vw, 3rem);
         font-weight: bold;
         text-align: center;
         margin-bottom: 2rem;
@@ -33,38 +39,129 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        padding: 0 1rem;
     }
+    
+    /* Detection cards - mobile responsive */
     .detection-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
+        padding: clamp(1rem, 3vw, 1.5rem);
         border-radius: 15px;
         color: white;
         margin: 1rem 0;
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        word-wrap: break-word;
     }
+    
+    /* Metric containers - responsive */
     .metric-container {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        padding: 1.5rem;
+        padding: clamp(0.8rem, 2.5vw, 1.5rem);
         border-radius: 12px;
         margin: 0.5rem 0;
         color: white;
         text-align: center;
+        font-size: clamp(0.8rem, 2vw, 1rem);
     }
+    
+    /* Method tags - responsive */
     .method-tag {
         background: #2ecc71;
         color: white;
         padding: 0.3rem 0.8rem;
         border-radius: 20px;
-        font-size: 0.8rem;
+        font-size: clamp(0.7rem, 1.5vw, 0.8rem);
         margin: 0.2rem;
         display: inline-block;
+        word-wrap: break-word;
     }
+    
+    /* Confidence levels */
     .confidence-high { background: #27ae60; }
     .confidence-medium { background: #f39c12; }
     .confidence-low { background: #e74c3c; }
     
+    /* Progress bar styling */
     .stProgress > div > div > div > div {
         background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    /* Mobile-specific adjustments */
+    @media (max-width: 768px) {
+        .main-header {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+        }
+        
+        .detection-card {
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }
+        
+        .metric-container {
+            padding: 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .method-tag {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+        }
+        
+        /* Make columns stack on mobile */
+        .element-container {
+            width: 100% !important;
+        }
+        
+        /* Improve file uploader on mobile */
+        .stFileUploader {
+            width: 100%;
+        }
+        
+        /* Better button sizing on mobile */
+        .stButton > button {
+            width: 100%;
+            margin: 0.25rem 0;
+        }
+        
+        /* Responsive sidebar */
+        .css-1d391kg {
+            width: 100% !important;
+        }
+    }
+    
+    /* Touch-friendly improvements */
+    @media (pointer: coarse) {
+        .stButton > button {
+            min-height: 44px;
+            padding: 0.75rem 1rem;
+        }
+        
+        .stSelectbox > div > div {
+            min-height: 44px;
+        }
+        
+        .stSlider {
+            padding: 1rem 0;
+        }
+    }
+    
+    /* Image display improvements */
+    .stImage {
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    /* Tab styling */
+    .stTabs > div > div > div > div {
+        font-weight: 600;
+        font-size: clamp(0.8rem, 2vw, 1rem);
+    }
+    
+    /* Better spacing for mobile */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -135,16 +232,17 @@ class UltimateFaceDetector:
                 
                 # Method 1: From cv2 data
                 try:
-                    if hasattr(cv2, 'data'):
-                        cascade_path = cv2.data.haarcascades + cascade_file
-                        cascade = cv2.CascadeClassifier(cascade_path)
-                        if not cascade.empty():
-                            self.detectors['opencv_cascades'].append({
-                                'detector': cascade,
-                                'name': cascade_file.replace('.xml', ''),
-                                'type': 'builtin'
-                            })
-                            continue
+                    # Try loading from cv2 data directory
+                    import cv2.data
+                    cascade_path = cv2.data.haarcascades + cascade_file
+                    cascade = cv2.CascadeClassifier(cascade_path)
+                    if not cascade.empty():
+                        self.detectors['opencv_cascades'].append({
+                            'detector': cascade,
+                            'name': cascade_file.replace('.xml', ''),
+                            'type': 'builtin'
+                        })
+                        continue
                 except:
                     pass
                 
@@ -1039,23 +1137,34 @@ class UltimateComputerVisionApp:
         start_time = time.time()
         
         if not batch_mode:
-            col1, col2 = st.columns([2, 1])
-            
             if show_original:
+                col1, col2 = st.columns([2, 1])
                 with col1:
                     st.image(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), 
                             caption="Original Image", use_container_width=True)
+                display_col = col1
+                progress_col = col2
+            else:
+                col1, col2 = st.columns([2, 1])
+                display_col = col1
+                progress_col = col1
             
-            with col2 if show_original else col1:
+            with progress_col:
                 st.markdown("#### 🎯 Ultimate Detection Progress")
                 progress = st.progress(0)
                 status_container = st.container()
+        else:
+            progress = None
+            status_container = None
+            display_col = None
+            progress_col = None
         
         try:
             # Ultimate face detection
-            if not batch_mode:
+            if not batch_mode and status_container:
                 with status_container:
                     st.text("🔍 Scanning with MediaPipe...")
+                if progress:
                     progress.progress(20)
             
             detections = self.detector.detect_faces(
@@ -1064,7 +1173,7 @@ class UltimateComputerVisionApp:
                 enable_methods=st.session_state.enabled_methods
             )
             
-            if not batch_mode:
+            if not batch_mode and progress and status_container:
                 progress.progress(100)
                 status_container.success("🎉 Detection Complete!")
             
@@ -1079,14 +1188,16 @@ class UltimateComputerVisionApp:
             processing_time = time.time() - start_time
             
             # Display results
-            if not batch_mode:
-                display_col = col1 if show_original else col1
+            if not batch_mode and display_col:
                 with display_col:
                     st.image(cv2.cvtColor(result_image, cv2.COLOR_BGR2RGB), 
                             caption=f"Ultimate Results ({len(detections)} faces detected)", 
                             use_container_width=True)
                 
-                with col2 if show_original else st.container():
+                if show_original and progress_col:
+                    with progress_col:
+                        self.display_detection_metrics(detections, processing_time, filename)
+                else:
                     self.display_detection_metrics(detections, processing_time, filename)
             
             # Save session data
