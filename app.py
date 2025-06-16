@@ -24,6 +24,7 @@ from comprehensive_detector import ComprehensiveDetector
 from reliable_detector import ReliableDetector
 from working_face_detector import WorkingFaceDetector
 from stable_face_detector import StableFaceDetector
+from precise_face_detector import PreciseFaceDetector
 
 # Initialize detectors
 @st.cache_resource
@@ -181,9 +182,9 @@ def process_uploaded_image(uploaded_image, gaze_detector, emotion_detector, face
     # Process image with enhanced multi-method detection
     with st.spinner("Processing image with multiple detection methods..."):
         try:
-            stable_detector = StableFaceDetector()
-            detections = stable_detector.detect_faces(image_array, confidence_threshold)
-            processed_image = stable_detector.draw_results(image_array, detections)
+            precise_detector = PreciseFaceDetector()
+            detections = precise_detector.detect_faces(image_array, confidence_threshold)
+            processed_image = precise_detector.draw_results(image_array, detections)
             
             if not detections:
                 st.warning("No faces detected. Try adjusting the confidence threshold or ensure the image contains clear faces.")
