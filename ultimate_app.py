@@ -12,6 +12,7 @@ import os
 import requests
 from io import BytesIO
 import base64
+import matplotlib.pyplot as plt
 
 # Configure Streamlit with mobile optimization
 st.set_page_config(
@@ -165,6 +166,15 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+def plot_histogram(series: pd.Series, bins: int = 20):
+    """Display a histogram using matplotlib since Streamlit lacks histogram_chart."""
+    counts, bin_edges = np.histogram(series.dropna(), bins=bins)
+    fig, ax = plt.subplots()
+    ax.bar(bin_edges[:-1], counts, width=np.diff(bin_edges), align="edge", edgecolor="black")
+    ax.set_xlabel(series.name if series.name else "Value")
+    ax.set_ylabel("Frequency")
+    st.pyplot(fig)
 
 class UltimateFaceDetector:
     """Ultimate face detector combining all available libraries with intelligent fallbacks"""
@@ -1490,12 +1500,12 @@ class UltimateComputerVisionApp:
             
             # Processing time distribution
             st.markdown("**Processing Time Distribution**")
-            st.histogram_chart(df['processing_time'])
+            plot_histogram(df['processing_time'])
         
         with col2:
             # Confidence distribution
-            st.markdown("**Confidence Score Distribution**") 
-            st.histogram_chart(df['avg_confidence'])
+            st.markdown("**Confidence Score Distribution**")
+            plot_histogram(df['avg_confidence'])
             
             # Daily activity
             if 'date' in df.columns:
@@ -1800,7 +1810,7 @@ class UltimateComputerVisionApp:
             
             with col1:
                 st.markdown("**Processing Time Distribution**")
-                st.histogram_chart(df['processing_time'])
+                plot_histogram(df['processing_time'])
                 
                 # Statistics
                 st.markdown("**Statistics:**")
@@ -1827,7 +1837,7 @@ class UltimateComputerVisionApp:
                 
                 with col1:
                     st.markdown("**Confidence Distribution**")
-                    st.histogram_chart(conf_data)
+                    plot_histogram(conf_data)
                 
                 with col2:
                     st.markdown("**Confidence Statistics**")
@@ -1881,7 +1891,7 @@ class UltimateComputerVisionApp:
             
             with col1:
                 st.markdown("**Face Count Distribution**")
-                st.histogram_chart(df['faces_detected'])
+                plot_histogram(df['faces_detected'])
             
             with col2:
                 st.markdown("**Face Count Statistics**")
