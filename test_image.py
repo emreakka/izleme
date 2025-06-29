@@ -1,7 +1,5 @@
-import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-import os
 
 def create_test_image_with_faces():
     """Create a test image with multiple face-like patterns for testing"""
@@ -55,8 +53,8 @@ def create_test_image_with_faces():
     # Convert back to numpy array
     result = np.array(pil_img)
     
-    # Save the test image
-    cv2.imwrite('test_faces.jpg', cv2.cvtColor(result, cv2.COLOR_RGB2BGR))
+    # Save the test image using PIL to avoid OpenCV dependency
+    pil_img.save('test_faces.jpg')
     print("Test image saved as 'test_faces.jpg'")
     
     return result
