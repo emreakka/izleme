@@ -53,7 +53,7 @@ def create_test_image_with_faces():
     # Convert back to numpy array
     result = np.array(pil_img)
     
-    # Save the test image using PIL to avoid OpenCV dependency
+  # Save the test image using PIL to avoid OpenCV dependency
     pil_img.save('test_faces.jpg')
     print("Test image saved as 'test_faces.jpg'")
     
