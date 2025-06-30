@@ -43,27 +43,27 @@ def draw_face_box(image, face_id, box_cv, attention_text="", head_pose_text=""):
     # Display ID
     id_text = f"ID: {face_id}"
     y_pos_id = startY - 5 - text_y_offset
-    if y_pos_id < 10: y_pos_id = startY + line_height # Adjust if too close to top
+    if y_pos_id < 10: y_pos_id = startY + line_height
     cv2.putText(image, id_text, (startX, y_pos_id), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    current_y_offset = y_pos_id # Keep track of the last text y-position
 
     # Display Attention Text
     if attention_text:
-        text_y_offset += line_height
-        y_pos_attn = startY - 5 - text_y_offset
-        if y_pos_attn < 10: y_pos_attn = y_pos_id + line_height # Position below ID text
+        # text_y_offset += line_height # This logic was a bit off
+        y_pos_attn = current_y_offset - line_height # Try to place above
+        if y_pos_attn < 10: # If it goes above image, place below previous text
+            y_pos_attn = current_y_offset + line_height
         cv2.putText(image, f"Attn: {attention_text}", (startX, y_pos_attn),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 0), 1)
-        text_y_offset += line_height
-
+        current_y_offset = y_pos_attn # Update for next text
 
     # Display Head Pose Text
     if head_pose_text:
-        y_pos_pose = startY - 5 - text_y_offset
-        if y_pos_pose < 10 : # If too close to top, try to position below previous text
-            if 'y_pos_attn' in locals():
-                 y_pos_pose = y_pos_attn + line_height
-            else:
-                 y_pos_pose = y_pos_id + line_height
+        y_pos_pose = current_y_offset - line_height # Try to place above previous
+        if y_pos_pose < 10 : # If it goes above image or too close to previous
+            y_pos_pose = current_y_offset + line_height
+            if y_pos_pose > startY + (endY - startY) - 5 : # If it goes into the box, adjust
+                 y_pos_pose = startY + line_height * 2 # Fallback inside if too crowded
         cv2.putText(image, f"Pose: {head_pose_text}", (startX, y_pos_pose),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 0, 255), 1)
 
@@ -103,7 +103,11 @@ def get_face_crop(image, face_box_cv, padding_factor=0.2):
 
 # --- Main Analysis Function ---
 def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg",
-                            face_conf_thresh=0.5, obj_conf_thresh=0.5, obj_nms_thresh=0.4, yolo_input_size=416):
+                            face_detector_backend='mtcnn', # Added backend option
+                            face_conf_thresh=0.9, # Adjusted default for MTCNN
+                            obj_conf_thresh=0.5,
+                            obj_nms_thresh=0.4,
+                            yolo_input_size=416):
     print(f"Analyzing image: {image_path}")
     image_bgr = cv2.imread(image_path)
     if image_bgr is None:
@@ -117,30 +121,35 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg",
     print("Initializing modules...")
     gaze_estimator = None
     attention_analyzer_instance = None
-    face_detector = None
-    face_recognizer = None
-    object_detector = None
-    head_pose_estimator_instance = None # Renamed for clarity
+    face_detector_instance = None # Renamed for clarity
+    face_recognizer_instance = None # Renamed for clarity
+    object_detector_instance = None # Renamed for clarity
+    head_pose_estimator_instance = None
 
     try:
-        face_detector = FaceDetector(confidence_threshold=face_conf_thresh)
-        face_recognizer = FaceRecognizer(known_faces_db_path=KNOWN_FACES_DB)
-        object_detector = ObjectDetector(config_path=OBJECT_DETECTOR_CFG,
+        face_detector_instance = FaceDetector(backend=face_detector_backend, confidence_threshold=face_conf_thresh)
+        face_recognizer_instance = FaceRecognizer(known_faces_db_path=KNOWN_FACES_DB)
+        object_detector_instance = ObjectDetector(config_path=OBJECT_DETECTOR_CFG,
                                          weights_path=OBJECT_DETECTOR_WEIGHTS,
                                          names_path=OBJECT_DETECTOR_NAMES,
                                          confidence_thresh=obj_conf_thresh,
                                          nms_thresh=obj_nms_thresh)
-        # Pass input size to object_detector.py (requires object_detector.py to be modified to accept these in __init__ or detect_objects)
-        # For now, assuming object_detector.py was modified as planned earlier to use self.input_width/height
-        object_detector.input_width = yolo_input_size
-        object_detector.input_height = yolo_input_size
+        object_detector_instance.input_width = yolo_input_size
+        object_detector_instance.input_height = yolo_input_size
 
         if HEAD_POSE_ENABLED and HeadPoseEstimator is not None:
-            head_pose_estimator_instance = HeadPoseEstimator(camera_matrix=None, dist_coeffs=None)
+            # Prepare default camera matrix (simple approximation)
+            focal_length = image_dimensions[1]
+            center = (image_dimensions[1]/2, image_dimensions[0]/2)
+            default_camera_matrix = np.array(
+                             [[focal_length, 0, center[0]],
+                              [0, focal_length, center[1]],
+                              [0, 0, 1]], dtype = "double"
+                             )
+            head_pose_estimator_instance = HeadPoseEstimator(camera_matrix=default_camera_matrix)
             print("HeadPoseEstimator initialized.")
         else:
             print("Head pose estimation disabled or module not found.")
-
 
         try:
             gaze_estimator = GazeEstimator()
@@ -158,19 +167,17 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg",
 
     except FileNotFoundError as e:
         print(f"ERROR: Model file not found for a detector. {e}")
-        print("Please ensure all model files are correctly placed and paths are correct.")
         return None, None
     except Exception as e:
         print(f"ERROR: Could not initialize modules: {e}")
         return None, None
 
-    analysis_results = {"image_path": image_path, "people": [], "objects": [], "detected_bodies": []} # Added detected_bodies
+    analysis_results = {"image_path": image_path, "people": [], "objects": [], "detected_bodies": []}
 
-    if object_detector:
+    if object_detector_instance:
         print("Detecting objects...")
-        # Pass input_width and input_height to detect_objects if that's how object_detector was modified
-        # Assuming ObjectDetector uses its internal self.input_width/height set during __init__
-        detected_objects_raw = object_detector.detect_objects(image_bgr)
+        # Pass input_size to detect_objects method
+        detected_objects_raw = object_detector_instance.detect_objects(image_bgr, input_width=yolo_input_size, input_height=yolo_input_size)
         processed_objects_list = []
         person_detections_from_yolo = []
 
@@ -182,37 +189,42 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg",
             }
             if class_name == "person":
                 person_detections_from_yolo.append(obj_info)
-                draw_object_box(annotated_image, f"Body", confidence, (x,y,w,h), color=(255,100,0)) # Orange for bodies
+                draw_object_box(annotated_image, f"Body", confidence, (x,y,w,h), color=(255,100,0))
             else:
                 processed_objects_list.append(obj_info)
-                # Assign a color per class (simple approach)
-                color = (int(class_id * 50 % 255), int(class_id * 100 % 255), int(class_id * 20 % 255)) # Varied colors
+                color = (int(class_id * 50 % 255), int(class_id * 100 % 255), int(class_id * 20 % 255))
                 draw_object_box(annotated_image, class_name, confidence, (x,y,w,h), color=color)
 
         analysis_results["objects"] = processed_objects_list
-        analysis_results["detected_bodies"] = person_detections_from_yolo
+        analysis_results["detected_bodies"] = person_detections_from_yolo # Store person/body detections from YOLO
         print(f"Found {len(processed_objects_list)} non-person object(s) and {len(person_detections_from_yolo)} person/body detection(s).")
     else:
         print("Object detector not initialized. Skipping object detection.")
 
 
     people_pipeline_data = []
-    if face_detector:
+    if face_detector_instance:
         print("Detecting faces...")
-        # detect_faces returns list of dicts: {'box': (x1,y1,x2,y2), 'landmarks': {}, 'confidence': float}
-        face_detections_data = face_detector.detect_faces(image_bgr)
+        # detect_faces now returns list of dicts: {'box': (x1,y1,x2,y2), 'landmarks': {}, 'confidence': float}
+        face_detections_data = face_detector_instance.detect_faces(image_bgr)
         print(f"Found {len(face_detections_data)} face(s) via face detector.")
 
-        if face_detections_data and face_recognizer:
+        if face_detections_data and face_recognizer_instance:
+            # Extract just boxes for face_recognizer
             opencv_format_boxes = [det['box'] for det in face_detections_data]
 
-            recognized_faces_output = face_recognizer.recognize_faces(image_rgb, opencv_format_boxes)
+            recognized_faces_output = face_recognizer_instance.recognize_faces(image_rgb, opencv_format_boxes)
 
-            # Match recognized_faces_output with face_detections_data
-            # This simple loop assumes recognized_faces_output corresponds to the order of opencv_format_boxes
-            # which in turn corresponds to face_detections_data. This should hold if no filtering happens in recognize_faces.
             for i, (face_id, face_loc_cv) in enumerate(recognized_faces_output):
-                original_det_data = face_detections_data[i] # Assumes order is preserved
+                original_det_data = {}
+                # Find the detection dict that corresponds to this face_loc_cv
+                # This assumes order is maintained. A more robust match would be by IoU if order is not guaranteed.
+                # For now, we assume the recognizer processes boxes in the order they were given from face_detections_data
+                if i < len(face_detections_data) and face_detections_data[i]['box'] == face_loc_cv:
+                    original_det_data = face_detections_data[i]
+                else: # Fallback if matching is tricky, though less ideal
+                    original_det_data = {'box': face_loc_cv, 'landmarks': None, 'confidence': None}
+
 
                 person_data_item = {
                     "id": face_id,
@@ -224,7 +236,7 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg",
                 }
 
                 # Head Pose Estimation
-                if head_pose_estimator_instance and person_data_item["landmarks"]:
+                if HEAD_POSE_ENABLED and head_pose_estimator_instance and person_data_item["landmarks"]:
                     pose = head_pose_estimator_instance.estimate_head_pose_from_landmarks(image_dimensions, person_data_item["landmarks"])
                     person_data_item["head_pose"] = pose
 
@@ -240,74 +252,76 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg",
                     person_data_item["gaze"] = {"text_direction": "N/A (Gaze Disabled)", "face_detected_by_gaze_tracker": False, "horizontal_ratio": None, "vertical_ratio": None}
 
                 people_pipeline_data.append(person_data_item)
-        elif not face_recognizer:
+        elif not face_recognizer_instance:
             print("Face recognizer not initialized. Skipping recognition and further person-specific analysis.")
-        # If only face_detector worked, populate people_pipeline_data with raw detections for attention analysis
-        elif face_detections_data and not face_recognizer:
-            print("Face recognizer not initialized, but faces were detected. Proceeding with generic IDs for attention analysis.")
-            for i, det_data in enumerate(face_detections_data):
-                face_id = f"face_{i}"
-                face_loc_cv = det_data['box']
-                person_data_item = {
-                    "id": face_id,
-                    "location_cv": face_loc_cv,
-                    "landmarks": det_data.get('landmarks'),
-                    "confidence_face": det_data.get('confidence'),
-                    "gaze": None,
-                    "head_pose": None,
-                }
-                if head_pose_estimator_instance and person_data_item["landmarks"]:
-                    pose = head_pose_estimator_instance.estimate_head_pose_from_landmarks(image_dimensions, person_data_item["landmarks"])
-                    person_data_item["head_pose"] = pose
-                if gaze_estimator:
-                    face_crop_bgr = get_face_crop(image_bgr, face_loc_cv, padding_factor=0.3)
-                    if face_crop_bgr is not None and face_crop_bgr.shape[0] > 10 and face_crop_bgr.shape[1] > 10:
-                         person_data_item["gaze"] = gaze_estimator.estimate_gaze(face_crop_bgr, face_id=face_id)
+            # If faces were detected but not recognized, still add them for attention analysis with generic IDs
+            if face_detections_data:
+                print("Faces detected, but recognizer not available. Using generic IDs for attention analysis.")
+                for i, det_data in enumerate(face_detections_data):
+                    face_id = f"face_{i}"
+                    face_loc_cv = det_data['box']
+                    person_data_item = {
+                        "id": face_id,
+                        "location_cv": face_loc_cv,
+                        "landmarks": det_data.get('landmarks'),
+                        "confidence_face": det_data.get('confidence'),
+                        "gaze": None, "head_pose": None
+                    }
+                    if HEAD_POSE_ENABLED and head_pose_estimator_instance and person_data_item["landmarks"]:
+                        pose = head_pose_estimator_instance.estimate_head_pose_from_landmarks(image_dimensions, person_data_item["landmarks"])
+                        person_data_item["head_pose"] = pose
+                    if gaze_estimator:
+                        face_crop_bgr = get_face_crop(image_bgr, face_loc_cv, padding_factor=0.3)
+                        if face_crop_bgr is not None and face_crop_bgr.shape[0] > 10 and face_crop_bgr.shape[1] > 10:
+                             person_data_item["gaze"] = gaze_estimator.estimate_gaze(face_crop_bgr, face_id=face_id)
+                        else:
+                            person_data_item["gaze"] = {"text_direction": "crop_error", "face_detected_by_gaze_tracker": False, "horizontal_ratio": None, "vertical_ratio": None}
                     else:
-                        person_data_item["gaze"] = {"text_direction": "crop_error", "face_detected_by_gaze_tracker": False, "horizontal_ratio": None, "vertical_ratio": None}
-                else:
-                    person_data_item["gaze"] = {"text_direction": "N/A (Gaze Disabled)", "face_detected_by_gaze_tracker": False, "horizontal_ratio": None, "vertical_ratio": None}
-                people_pipeline_data.append(person_data_item)
+                        person_data_item["gaze"] = {"text_direction": "N/A (Gaze Disabled)", "face_detected_by_gaze_tracker": False, "horizontal_ratio": None, "vertical_ratio": None}
+                    people_pipeline_data.append(person_data_item)
 
     else:
-        print("Face detector not initialized or no faces detected. Skipping face-related processing.")
+        print("Face detector not initialized or no faces detected by detector. Skipping face-related processing.")
 
     print("Analyzing attention...")
-    final_people_results = [] # This will be the list stored in analysis_results["people"]
+    final_people_results = []
     if attention_analyzer_instance and people_pipeline_data:
         for person_data_item in people_pipeline_data:
             attention_target_desc, attention_details = attention_analyzer_instance.determine_attention(
                 person_data_item,
                 people_pipeline_data,
-                analysis_results["objects"] + analysis_results.get("detected_bodies", []), # Combine objects and bodies
+                analysis_results["objects"] + analysis_results.get("detected_bodies", []),
                 image_dimensions
             )
             person_data_item["attention_target"] = attention_target_desc
             person_data_item["attention_details"] = attention_details
-            final_people_results.append(person_data_item) # Add the updated item
+            final_people_results.append(person_data_item)
 
             head_pose_str = ""
             if person_data_item.get("head_pose"):
                 hp = person_data_item["head_pose"]
-                if hp and isinstance(hp, dict): # Check if hp is a dict and not None
+                if hp and isinstance(hp, dict):
                     roll = hp.get('roll', 'N/A')
                     pitch = hp.get('pitch', 'N/A')
                     yaw = hp.get('yaw', 'N/A')
                     try:
                         head_pose_str = f"R:{float(roll):.0f} P:{float(pitch):.0f} Y:{float(yaw):.0f}"
-                    except (ValueError, TypeError): # Handle cases where conversion to float might fail
-                        head_pose_str = "PoseErr"
-                elif hp is None : # If estimate_head_pose_from_landmarks returned None
-                    head_pose_str = "NoLndmrks"
+                    except (ValueError, TypeError):
+                        head_pose_str = "PoseDataError"
+                elif hp is None and person_data_item["landmarks"] is not None :
+                     head_pose_str = "PoseEstFail" # Landmarks were there, but PnP failed
+                elif person_data_item["landmarks"] is None and HEAD_POSE_ENABLED:
+                     head_pose_str = "NoLndmrks"
+
 
             draw_face_box(annotated_image, person_data_item["id"], person_data_item["location_cv"],
                           attention_text=attention_target_desc, head_pose_text=head_pose_str)
 
     elif not people_pipeline_data:
         print("No people data with face detections to analyze attention for.")
-    else: # attention_analyzer_instance is None or other issues
+    else:
         print("Warning: AttentionAnalyzer not available or no people data. Skipping detailed attention analysis and using basic drawing.")
-        for person_data_item in people_pipeline_data: # Draw with whatever info we have
+        for person_data_item in people_pipeline_data:
             gaze_text_for_draw = "N/A"
             if person_data_item.get("gaze") and isinstance(person_data_item["gaze"], dict) and person_data_item["gaze"].get("text_direction"):
                 gaze_text_for_draw = person_data_item["gaze"]["text_direction"]
@@ -322,24 +336,24 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg",
                     try:
                         head_pose_str = f"R:{float(roll):.0f} P:{float(pitch):.0f} Y:{float(yaw):.0f}"
                     except (ValueError, TypeError):
-                        head_pose_str = "PoseErr"
-                elif hp is None:
+                        head_pose_str = "PoseDataError"
+                elif hp is None and person_data_item["landmarks"] is not None :
+                     head_pose_str = "PoseEstFail"
+                elif person_data_item["landmarks"] is None and HEAD_POSE_ENABLED:
                      head_pose_str = "NoLndmrks"
 
             draw_face_box(annotated_image, person_data_item["id"], person_data_item["location_cv"],
                           attention_text=f"Gaze: {gaze_text_for_draw}", head_pose_text=head_pose_str)
-            final_people_results.append(person_data_item) # Still add to results
+            final_people_results.append(person_data_item)
+
 
     analysis_results["people"] = final_people_results
 
-    # Save annotated image
     output_image_path = os.path.join(OUTPUT_DIR, output_filename)
     cv2.imwrite(output_image_path, annotated_image)
     print(f"Annotated image saved to: {output_image_path}")
 
-    # Print and Save structured results (JSON)
-    base_output_filename, _ = os.path.splitext(output_filename)
-    output_json_path = os.path.join(OUTPUT_DIR, f"{base_output_filename}.json")
+    output_json_path = os.path.join(OUTPUT_DIR, os.path.splitext(output_filename)[0] + ".json")
 
     def convert_numpy_types(obj):
         if isinstance(obj, np.integer): return int(obj)
@@ -362,7 +376,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Classroom Attention Analyzer")
     parser.add_argument("-i", "--image", required=True, help="Path to the input image.")
     parser.add_argument("-o", "--output", default=None, help="Filename for the output annotated image (e.g., result.jpg). Default is <input_name>_analyzed.<ext>")
-    parser.add_argument("--face_conf", type=float, default=0.9, help="Confidence threshold for face detection (MTCNN: 0.9+, OpenCV DNN: ~0.5).")
+    parser.add_argument("--face_backend", type=str, default="mtcnn", choices=['mtcnn', 'opencv_dnn'], help="Face detection backend ('mtcnn' or 'opencv_dnn'). Default: mtcnn")
+    parser.add_argument("--face_conf", type=float, default=0.9, help="Confidence threshold for face detection. Default 0.9 for MTCNN, recommend ~0.5 for OpenCV DNN.")
     parser.add_argument("--obj_conf", type=float, default=0.5, help="Confidence threshold for object detection (0.0-1.0).")
     parser.add_argument("--obj_nms", type=float, default=0.4, help="NMS threshold for object detection (0.0-1.0).")
     parser.add_argument("--yolo_size", type=int, default=416, choices=[320, 416, 608], help="Input size for YOLO (e.g., 320, 416, 608).")
@@ -380,6 +395,7 @@ if __name__ == "__main__":
         name, ext = os.path.splitext(base)
         output_fname = f"{name}_analyzed{ext}" if ext else f"{name}_analyzed.jpg"
 
+    # Create dummy model files if they don't exist
     dummy_model_dirs = {
         "models/face_detection": {
             os.path.basename(FACE_DETECTOR_PROTOTXT): "#Dummy prototxt for OpenCV DNN fallback",
@@ -388,7 +404,7 @@ if __name__ == "__main__":
         "models/object_detection": {
             os.path.basename(OBJECT_DETECTOR_CFG): f"#Dummy yolo cfg",
             os.path.basename(OBJECT_DETECTOR_WEIGHTS): "#Dummy yolo weights",
-            os.path.basename(OBJECT_DETECTOR_NAMES): "person\nbook\nlaptop\ncell phone\ntvmonitor\nchair\ndesk\nbackpack\nwhiteboard\nblackboard"
+            os.path.basename(OBJECT_DETECTOR_NAMES): "person\nbook\nlaptop\ncell phone\ntvmonitor\nchair\ndesk\nbackpack\nwhiteboard\nblackboard" # Added whiteboard/blackboard
         }
     }
     for dir_path, files_dict in dummy_model_dirs.items():
@@ -417,6 +433,7 @@ if __name__ == "__main__":
     results, returned_json_path_from_func = analyze_classroom_image(
         args.image,
         output_filename=output_fname,
+        face_detector_backend=args.face_backend,
         face_conf_thresh=args.face_conf,
         obj_conf_thresh=args.obj_conf,
         obj_nms_thresh=args.obj_nms,
@@ -449,20 +466,29 @@ if __name__ == "__main__":
             head_pose_display = "N/A"
             if person.get("head_pose") and isinstance(person["head_pose"], dict):
                 hp = person["head_pose"]
-                try: # Ensure roll, pitch, yaw are numbers before formatting
-                    roll = float(hp.get('roll', 'N/A'))
-                    pitch = float(hp.get('pitch', 'N/A'))
-                    yaw = float(hp.get('yaw', 'N/A'))
-                    head_pose_display = f"R:{roll:.0f},P:{pitch:.0f},Y:{yaw:.0f}"
-                except ValueError:
+                try:
+                    roll_val = hp.get('roll', 'N/A')
+                    pitch_val = hp.get('pitch', 'N/A')
+                    yaw_val = hp.get('yaw', 'N/A')
+
+                    roll_str = f"{float(roll_val):.0f}" if isinstance(roll_val, (int, float)) else "N/A"
+                    pitch_str = f"{float(pitch_val):.0f}" if isinstance(pitch_val, (int, float)) else "N/A"
+                    yaw_str = f"{float(yaw_val):.0f}" if isinstance(yaw_val, (int, float)) else "N/A"
+                    head_pose_display = f"R:{roll_str},P:{pitch_str},Y:{yaw_str}"
+                except (ValueError, TypeError):
                     head_pose_display = "PoseDataError"
             elif person.get("head_pose") is None and person.get("landmarks") is None and HEAD_POSE_ENABLED:
                  head_pose_display = "NoLndmrks"
+            elif person.get("head_pose") is None and person.get("landmarks") is not None and HEAD_POSE_ENABLED: # Explicitly check for landmarks being present but pose failing
+                 head_pose_display = "PoseEstFail"
 
 
             face_conf_display = "N/A"
-            if person.get('confidence_face') is not None:
-                face_conf_display = f"{person['confidence_face']:.2f}"
+            if person.get('confidence_face') is not None: # Check if key exists and is not None
+                try:
+                    face_conf_display = f"{float(person['confidence_face']):.2f}"
+                except (ValueError, TypeError):
+                    face_conf_display = "N/A"
 
 
             print(f"  Person {i+1}: ID={person['id']}, FaceConf={face_conf_display}, Gaze='{gaze_info_text}', HeadPose='{head_pose_display}', Attention='{attention_target_text}'")
@@ -476,4 +502,4 @@ if __name__ == "__main__":
 
 ```
 
-I will now run the test command again.
+Now, running the test command again with the cleaned `classroom_analyzer.py`.
