@@ -9,7 +9,7 @@ from face_detector import FaceDetector
 from face_recognizer import FaceRecognizer
 from object_detector import ObjectDetector
 from gaze_estimator import GazeEstimator # Will check for GazeTracking library internally
-from attention_analyzer_logic import AttentionAnalyzer # Added Attention Analyzer
+from attention_analyzer_logic import AttentionAnalyzer
 
 # --- Configuration ---
 FACE_DETECTOR_PROTOTXT = "models/face_detection/deploy.prototxt.txt"
@@ -35,8 +35,8 @@ def draw_face_box(image, face_id, box_cv, attention_text=""):
     cv2.putText(image, id_text, (startX, y_id), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
     if attention_text:
-        y_attention = y_id - 20 # Position attention text above ID text
-        if y_attention < 10 : # If too close to top, position below ID text
+        y_attention = y_id - 20
+        if y_attention < 10 :
              y_attention = y_id + 15 if y_id + 15 < endY -5 else endY - 5
         cv2.putText(image, f"Attn: {attention_text}", (startX, y_attention),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 0), 1)
@@ -93,12 +93,14 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg"):
                                          weights_path=OBJECT_DETECTOR_WEIGHTS,
                                          names_path=OBJECT_DETECTOR_NAMES)
         try:
-            # This will print warnings if gaze-tracking is not installed or dlib model is missing
             gaze_estimator = GazeEstimator()
-            if gaze_estimator.gaze is None: # Further check if GazeTracking() itself failed internally
-                print("Warning: GazeEstimator's GazeTracking component failed to initialize properly. Gaze estimation will be skipped.")
+            if gaze_estimator.gaze is None:
+                print("Warning: GazeEstimator initialized, but GazeTracking component is not available. Gaze estimation will be skipped.")
                 gaze_estimator = None
-        except Exception as e_gaze: # Catch any other GazeEstimator init errors
+        except ImportError:
+            print("Warning: GazeTracking library not found. Gaze estimation will be skipped.")
+            gaze_estimator = None
+        except Exception as e_gaze:
             print(f"Warning: GazeEstimator failed to initialize ({e_gaze}). Gaze estimation will be skipped.")
             gaze_estimator = None
 
@@ -108,13 +110,12 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg"):
         print(f"ERROR: Model file not found for a detector. {e}")
         print("Please ensure all model files are correctly placed and paths are correct.")
         return None, None
-    except Exception as e: # Catch other initialization errors
+    except Exception as e:
         print(f"ERROR: Could not initialize modules: {e}")
         return None, None
 
     analysis_results = {"image_path": image_path, "people": [], "objects": []}
 
-    # 1. Object Detection
     print("Detecting objects...")
     detected_objects_raw = object_detector.detect_objects(image_bgr)
     processed_objects_list = []
@@ -125,18 +126,15 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg"):
             "location_cv": (x, y, x + w, y + h)
         }
         processed_objects_list.append(obj_info)
-        # Ensure color components are integers
         color = (int(class_id * 20 % 255), int(class_id * 50 % 255), int(class_id * 80 % 255))
         draw_object_box(annotated_image, class_name, confidence, (x,y,w,h), color=color)
     analysis_results["objects"] = processed_objects_list
     print(f"Found {len(processed_objects_list)} object(s).")
 
-    # 2. Face Detection
     print("Detecting faces...")
-    detected_face_locations_cv = face_detector.detect_faces(image_bgr) # List of (startX, startY, endX, endY)
+    detected_face_locations_cv = face_detector.detect_faces(image_bgr)
     print(f"Found {len(detected_face_locations_cv)} face(s).")
 
-    # 3. Face Recognition & Gaze Estimation (per face)
     people_pipeline_data = []
     if detected_face_locations_cv:
         recognized_faces_output = face_recognizer.recognize_faces(image_rgb, detected_face_locations_cv)
@@ -144,20 +142,18 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg"):
         for face_id, face_loc_cv in recognized_faces_output:
             person_data_item = {"id": face_id, "location_cv": face_loc_cv, "gaze": None}
 
-            if gaze_estimator: # Check if gaze_estimator was successfully initialized
+            if gaze_estimator:
                 face_crop_bgr = get_face_crop(image_bgr, face_loc_cv, padding_factor=0.3)
                 if face_crop_bgr is not None and face_crop_bgr.shape[0] > 10 and face_crop_bgr.shape[1] > 10:
                     gaze_info = gaze_estimator.estimate_gaze(face_crop_bgr, face_id=face_id)
                     person_data_item["gaze"] = gaze_info
                 else:
-                    # print(f"  Skipping gaze for {face_id} due to invalid crop.")
                     person_data_item["gaze"] = {"text_direction": "crop_error", "face_detected_by_gaze_tracker": False, "horizontal_ratio": None, "vertical_ratio": None}
             else:
                 person_data_item["gaze"] = {"text_direction": "N/A (Gaze Disabled)", "face_detected_by_gaze_tracker": False, "horizontal_ratio": None, "vertical_ratio": None}
 
             people_pipeline_data.append(person_data_item)
 
-    # 4. Attention Analysis for each person
     print("Analyzing attention...")
     final_people_results = []
     if attention_analyzer_instance:
@@ -186,14 +182,11 @@ def analyze_classroom_image(image_path, output_filename="analyzed_image.jpg"):
 
     analysis_results["people"] = final_people_results
 
-    # 5. Save annotated image
     output_image_path = os.path.join(OUTPUT_DIR, output_filename)
     cv2.imwrite(output_image_path, annotated_image)
     print(f"Annotated image saved to: {output_image_path}")
 
-    # 6. Print and Save structured results (JSON)
-    base_output_filename, _ = os.path.splitext(output_filename)
-    output_json_path = os.path.join(OUTPUT_DIR, f"{base_output_filename}.json")
+    output_json_path = os.path.join(OUTPUT_DIR, os.path.splitext(output_filename)[0] + ".json")
 
     def convert_numpy_types(obj):
         if isinstance(obj, np.integer): return int(obj)
@@ -250,27 +243,26 @@ if __name__ == "__main__":
                 print(f"Created dummy model file: {file_path} (for structural run only)")
 
     data_dir = os.path.dirname(KNOWN_FACES_DB)
-    if data_dir and not os.path.exists(data_dir): # Check if data_dir is not empty string
+    if data_dir and not os.path.exists(data_dir):
         os.makedirs(data_dir, exist_ok=True)
         print(f"Created data directory: {data_dir}")
+    if not os.path.exists(KNOWN_FACES_DB): # Check before creating
+        if not data_dir: # If KNOWN_FACES_DB is in root and doesn't exist
+             with open(KNOWN_FACES_DB, "w") as f:
+                json.dump({"encodings": [], "ids": []}, f)
+             print(f"Created empty known faces DB: {KNOWN_FACES_DB}")
+        elif data_dir: # If it's in a subdir (like 'data/')
+            with open(KNOWN_FACES_DB, "w") as f:
+                json.dump({"encodings": [], "ids": []}, f)
+            print(f"Created empty known faces DB: {KNOWN_FACES_DB}")
 
-    # Ensure KNOWN_FACES_DB exists, even if empty, before FaceRecognizer tries to load it
-    if not os.path.exists(KNOWN_FACES_DB):
-        db_dir = os.path.dirname(KNOWN_FACES_DB)
-        if db_dir and not os.path.exists(db_dir): # Ensure 'data/' directory exists
-            os.makedirs(db_dir, exist_ok=True)
-        with open(KNOWN_FACES_DB, "w") as f:
-            json.dump({"encodings": [], "ids": []}, f) # Create an empty DB
-        print(f"Created empty known faces DB: {KNOWN_FACES_DB}")
 
+    final_json_path_for_summary = os.path.join(OUTPUT_DIR, os.path.splitext(output_fname)[0] + ".json")
 
-    # Define final_json_path here for broader scope
-    final_json_path = os.path.join(OUTPUT_DIR, os.path.splitext(output_fname)[0] + ".json")
+    results, returned_json_path_from_func = analyze_classroom_image(args.image, output_filename=output_fname)
 
-    results, returned_json_path = analyze_classroom_image(args.image, output_filename=output_fname)
-
-    if returned_json_path:
-        final_json_path = returned_json_path # Update if function returns a valid path
+    if returned_json_path_from_func:
+        final_json_path_for_summary = returned_json_path_from_func
 
     if results:
         print("\n--- Summary of Analysis ---")
@@ -279,7 +271,8 @@ if __name__ == "__main__":
         print(f"Detected People: {len(results['people'])}")
         for i, person in enumerate(results['people']):
             gaze_info_text = "N/A"
-            if person.get('gaze') and person['gaze'].get('text_direction'):
+            # Check if 'gaze' key exists and is not None, then check 'text_direction'
+            if person.get('gaze') and isinstance(person['gaze'], dict) and person['gaze'].get('text_direction'):
                 gaze_info_text = person['gaze']['text_direction']
 
             attention_target_text = person.get('attention_target', "N/A")
@@ -289,26 +282,9 @@ if __name__ == "__main__":
         print("--- End of Summary ---")
         output_image_full_path = os.path.join(OUTPUT_DIR, output_fname)
         print(f"Annotated image is available at: {output_image_full_path}")
-        print(f"JSON results are available at: {final_json_path}")
+        print(f"JSON results are available at: {final_json_path_for_summary}")
     else:
         print("Analysis failed or returned no results.")
-        # output_image_full_path might not exist if analysis failed early
-        # output_image_full_path = os.path.join(OUTPUT_DIR, output_fname) # This line is fine here or can be removed if only printed on success
-
-    # Optional display part (commented out for non-GUI environments)
-    # if os.path.exists(output_image_full_path) and results:
-    #     try:
-    #         img_display = cv2.imread(output_image_full_path)
-    #         if img_display is not None:
-    #             cv2.imshow("Annotated Classroom Image", img_display)
-    #             print("\nDisplaying annotated image. Press any key to close window.")
-    #             cv2.waitKey(0)
-    #             cv2.destroyAllWindows()
-    #         else:
-    #             print(f"Could not load annotated image for display from {output_image_full_path}")
-    #     except Exception as e:
-    #         print(f"Could not display image (may require a GUI environment): {e}")
-    #         # print(f"Annotated image saved at: {output_image_full_path}") # Already printed
-    #         pass
 ```
-Now that `classroom_analyzer.py` has been corrected to remove the stray markdown characters and properly integrate the `AttentionAnalyzer`, I will re-run the test script.
+
+Now, I will execute the test command again.
