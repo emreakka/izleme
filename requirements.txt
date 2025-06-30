@@ -1,0 +1,6 @@
+opencv-python
+numpy
+face-recognition
+mtcnn
+tensorflow # or tensorflow-cpu if GPU is not available/needed
+gaze-tracking
